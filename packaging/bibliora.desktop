@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Bibliora
+GenericName=Bible
+Comment=Read the Bible
+Exec=bibliora %u
+Icon=bibliora
+Terminal=false
+Categories=Education;Literature;
+Keywords=bible;scripture;reading;
+MimeType=x-scheme-handler/bibliora;
+StartupWMClass=bibliora

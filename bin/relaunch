@@ -1,0 +1,140 @@
+#!/bin/bash
+# Rebuild Bibliora and install it to ~/.local. When the installed app changed,
+# reopen it where its window was and leave the keyboard where it was.
+#
+# The new Bibliora opens beside the old one, which then quits, so the new window
+# takes over the old one's tile exactly. Nothing else on the desktop is moved
+# or resized. --replace lets the new Bibliora start while the old one still runs
+# (a plain launch would just bring the old one forward).
+#
+# Claude Code runs this as a Stop hook (--hook) after every turn, so it does
+# nothing when the build installs nothing new.
+
+set -uo pipefail
+
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+build="$root/build-release"
+app="$HOME/.local/bin/bibliora"
+stamp="$build/.installed"
+
+# One at a time, when two Claude sessions stop together.
+exec 9>"${XDG_RUNTIME_DIR:-/tmp}/bibliora-relaunch.lock"
+flock 9
+
+hook=false
+retried=false
+if [[ ${1:-} == --hook ]]; then
+  hook=true
+  retried=$(jq -r '.stop_hook_active // false' 2>/dev/null || echo false)
+fi
+
+# In the hook, exit 2 hands the error back to Claude to fix, once in a row.
+fail() {
+  echo "$1" >&2
+  if $hook && [[ $retried != true ]]; then exit 2; fi
+  exit 1
+}
+
+if [[ ! -f $build/build.ninja ]]; then
+  out=$(cmake -S "$root" -B "$build" -G Ninja -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX="$HOME/.local" 2>&1) || fail "Bibliora didn't configure:"$'\n'"$(tail -30 <<<"$out")"
+fi
+out=$(cmake --build "$build" 2>&1) || fail "Bibliora didn't build:"$'\n'"$(tail -40 <<<"$out")"
+
+sum=$(cat "$build/bibliora" "$root"/packaging/bibliora.{desktop,png} | sha256sum | cut -d' ' -f1)
+if [[ -x $app && -f $stamp && $(<"$stamp") == "$sum" ]]; then
+  exit 0
+fi
+
+dispatch() {
+  local reply
+  reply=$(hyprctl dispatch "$1" 2>&1)
+  [[ $reply == ok ]] || echo "hyprctl dispatch $1: $reply" >&2
+}
+
+# Processes running the installed binary, not a ./build/bibliora test run.
+installed_pids() {
+  local pid
+  for pid in $(pgrep -x bibliora); do
+    [[ $(readlink "/proc/$pid/exe" 2>/dev/null) == "$app"* ]] && echo "$pid"
+  done
+}
+
+new_pids() {
+  local pid old
+  for pid in $(installed_pids); do
+    for old in "${old_pids[@]}"; do [[ $pid == "$old" ]] && continue 2; done
+    echo "$pid"
+  done
+}
+
+# The most recently focused window belonging to one of the given pids.
+window_of() {
+  local pids
+  pids=$(printf '%s\n' "$@" | jq -R 'select(length > 0) | tonumber' | jq -s -c .)
+  hyprctl clients -j | jq -c --argjson pids "$pids" '[.[] | select(.pid as $p | $pids | index($p))] | sort_by(.focusHistoryID) | first // empty'
+}
+
+old_pids=($(installed_pids))
+old=$(window_of "${old_pids[@]}")
+focused=$(hyprctl activewindow -j | jq -r '.address // empty')
+
+# Unlink first: the old Bibliora is still running from this file.
+rm -f "$app"
+cmake --install "$build" >/dev/null || fail "Bibliora didn't install."
+echo "$sum" >"$stamp"
+# So xdg-open hands bibliora:// links to it.
+update-desktop-database "$HOME/.local/share/applications" >/dev/null 2>&1 || true
+
+# Through Hyprland, like a keybinding, so Bibliora gets the desktop's environment.
+launch="uwsm-app -- $app --replace"
+if [[ -z $old ]]; then
+  dispatch "hl.dsp.exec_cmd(\"$launch\")"
+elif hyprctl monitors -j | jq -e --argjson ws "$(jq .workspace.id <<<"$old")" \
+  'any(.[]; .activeWorkspace.id == $ws or .specialWorkspace.id == $ws)' >/dev/null; then
+  # On screen: a new window splits the focused one, so focus the old Bibliora.
+  dispatch "hl.dsp.focus({ window = \"address:$(jq -r .address <<<"$old")\" })"
+  dispatch "hl.dsp.exec_cmd(\"$launch\")"
+else
+  workspace=$(jq -r '.workspace | if .id > 0 then (.id | tostring) elif (.name | startswith("special:")) then .name else "name:" + .name end' <<<"$old")
+  hyprctl eval "hl.exec_cmd(\"$launch\", { workspace = \"$workspace silent\" })" >/dev/null
+fi
+
+new=
+for _ in {1..100}; do
+  new=$(window_of $(new_pids))
+  [[ -n $new ]] && break
+  sleep 0.1
+done
+[[ -n $new ]] || fail "Bibliora was installed but its window didn't appear."
+win="address:$(jq -r .address <<<"$new")"
+
+if ((${#old_pids[@]})); then
+  kill "${old_pids[@]}" 2>/dev/null
+  for _ in {1..50}; do
+    kill -0 "${old_pids[@]}" 2>/dev/null || break
+    sleep 0.1
+  done
+  kill -9 "${old_pids[@]}" 2>/dev/null
+fi
+
+if [[ -n $old && $(jq .floating <<<"$old") == true ]]; then
+  read -r x y w h < <(jq -r '"\(.at[0]) \(.at[1]) \(.size[0]) \(.size[1])"' <<<"$old")
+  dispatch "hl.dsp.window.float({ window = \"$win\", action = \"enable\" })"
+  dispatch "hl.dsp.window.resize({ window = \"$win\", x = $w, y = $h })"
+  dispatch "hl.dsp.window.move({ window = \"$win\", x = $x, y = $y })"
+fi
+
+# Leave the keyboard where it was; if that was Bibliora, it is the new window.
+if [[ -n $focused && $focused != $(jq -r '.address // empty' <<<"$old") ]]; then
+  dispatch "hl.dsp.focus({ window = \"address:$focused\" })"
+elif [[ -n $old ]]; then
+  dispatch "hl.dsp.focus({ window = \"$win\" })"
+fi
+
+ws=$(hyprctl clients -j | jq -r --arg a "${win#address:}" '.[] | select(.address == $a) | .workspace.name')
+if $hook; then
+  jq -n --arg ws "$ws" '{systemMessage: "Relaunched Bibliora on workspace \($ws)"}'
+else
+  echo "Relaunched Bibliora on workspace $ws."
+fi
