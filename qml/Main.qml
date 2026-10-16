@@ -180,7 +180,7 @@ Window {
             }
         }
 
-        // Beneath the page: where you are in the chapter, or what's selected.
+        // Beneath the page, while selecting: what's selected and the keys.
         Item {
             id: foot
 
@@ -189,14 +189,6 @@ Window {
             y: window.height - window.footHeight - Theme.sp(14)
             height: window.footHeight
             visible: Reader.ready
-
-            Txt {
-                anchors.centerIn: parent
-                visible: !Reader.selecting && Reader.pageCount > 1
-                text: (Reader.page + 1) + " / " + Reader.pageCount
-                size: "small"
-                tone: "faint"
-            }
 
             Row {
                 anchors.centerIn: parent
