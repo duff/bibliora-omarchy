@@ -1,0 +1,24 @@
+Bibliora carries these translations of the Bible, each under its own terms.
+
+ASV
+American Standard Version, 1901. Public domain.
+
+KJV
+King James Version. Public domain.
+
+LSB
+Legacy Standard Bible, Copyright © 2021 by The Lockman Foundation. All rights
+reserved. Managed in partnership with Three Sixteen Publishing Inc.
+lsbible.org, 316publishing.com
+
+NASB 95
+New American Standard Bible® (NASB), Copyright © 1960, 1971, 1977, 1995 by
+The Lockman Foundation. Used by permission. All rights reserved.
+www.lockman.org
+
+NKJV
+New King James Version®, Copyright © 1982, Thomas Nelson. All rights
+reserved. www.thomasnelsonbibles.com
+
+The dictionary's definitions, example sentences, pronunciations and synonyms
+were all created with Grok.

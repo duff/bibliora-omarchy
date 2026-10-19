@@ -69,6 +69,8 @@ install(TARGETS bibliora RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(FILES packaging/bibliora.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
 install(FILES packaging/bibliora.png
         DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/512x512/apps)
-# Bibliora's license and the reading fonts' (SIL Open Font License).
+# Bibliora's license, the reading fonts' (SIL Open Font License), and the
+# translations' copyrights.
 file(GLOB BIBLIORA_FONT_LICENSES resources/fonts/*-OFL.txt)
-install(FILES LICENSE ${BIBLIORA_FONT_LICENSES} DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/bibliora)
+install(FILES LICENSE ${BIBLIORA_FONT_LICENSES} packaging/translations.txt
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/bibliora)
