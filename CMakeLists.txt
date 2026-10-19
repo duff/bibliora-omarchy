@@ -59,6 +59,7 @@ foreach(test_src ${BIBLIORA_TESTS})
     get_filename_component(test_name ${test_src} NAME_WE)
     qt_add_executable(${test_name} ${test_src})
     target_link_libraries(${test_name} PRIVATE bibliora_core Qt6::Test)
+    target_compile_definitions(${test_name} PRIVATE BIBLIORA_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
     add_test(NAME ${test_name} COMMAND ${test_name})
     set_tests_properties(${test_name} PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endforeach()
@@ -69,6 +70,8 @@ install(TARGETS bibliora RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(FILES packaging/bibliora.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
 install(FILES packaging/bibliora.png
         DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/512x512/apps)
+# The agent skill. The window links it into each agent's skills folder.
+install(DIRECTORY skills/bibliora DESTINATION ${CMAKE_INSTALL_DATADIR}/bibliora/skills)
 # Bibliora's license, the reading fonts' (SIL Open Font License), and the
 # translations' copyrights.
 file(GLOB BIBLIORA_FONT_LICENSES resources/fonts/*-OFL.txt)

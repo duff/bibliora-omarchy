@@ -4,9 +4,11 @@
 #include "Reader.h"
 #include "Reference.h"
 #include "SearchQuery.h"
+#include "Skill.h"
 #include "Theme.h"
 
 #include <QCommandLineParser>
+#include <QDir>
 #include <QElapsedTimer>
 #include <QGuiApplication>
 #include <QJsonArray>
@@ -17,6 +19,7 @@
 #include <QQmlApplicationEngine>
 #include <QQuickWindow>
 #include <QSet>
+#include <QSettings>
 #include <QSocketNotifier>
 #include <QTimer>
 
@@ -166,6 +169,52 @@ int define(Bible &bible, const QString &word)
     return 0;
 }
 
+// The skills folders of the AI agents set up for this person.
+QStringList agentFolders()
+{
+    return Skill::agentFolders(QDir::homePath(), qEnvironmentVariable("CLAUDE_CONFIG_DIR"),
+                               qEnvironmentVariable("CODEX_HOME"));
+}
+
+// Each person gets the agent skill without a step of their own: the window
+// links it when it opens. After bibliora skill remove, it stays away.
+const QString kSkillDeclined = QStringLiteral("agents/skill_declined");
+
+// bibliora skill install|remove
+int skill(const QString &action)
+{
+    QSettings settings;
+    if (action == QLatin1String("remove")) {
+        settings.setValue(kSkillDeclined, true);
+        const Skill::Links links = Skill::unlink(agentFolders());
+        for (const QString &path : links.changed)
+            print(QStringLiteral("Removed %1\n").arg(path));
+        for (const QString &path : links.skipped)
+            print(QStringLiteral("Left %1 alone: it isn't Bibliora's.\n").arg(path));
+        if (!links.error.isEmpty())
+            return fail(links.error);
+        print(QStringLiteral("Bibliora won't link the skill again until bibliora skill install.\n"));
+        return 0;
+    }
+    if (action != QLatin1String("install"))
+        return fail(QStringLiteral("Say bibliora skill install or bibliora skill remove."), 2);
+    const QString dir = Skill::installedDir(QCoreApplication::applicationDirPath());
+    if (dir.isEmpty())
+        return fail(QStringLiteral("This bibliora has no skill installed beside it."));
+    settings.remove(kSkillDeclined);
+    const QStringList folders = agentFolders();
+    if (folders.isEmpty())
+        return fail(QStringLiteral("There are no AI agents set up here (~/.claude, ~/.codex, ~/.pi/agent or ~/.agents)."));
+    const Skill::Links links = Skill::link(dir, folders);
+    for (const QString &path : links.changed)
+        print(QStringLiteral("Linked the Bibliora skill in %1\n").arg(path));
+    for (const QString &path : links.unchanged)
+        print(QStringLiteral("Already linked in %1\n").arg(path));
+    for (const QString &path : links.skipped)
+        print(QStringLiteral("Left %1 alone: it isn't Bibliora's.\n").arg(path));
+    return links.error.isEmpty() ? 0 : fail(links.error);
+}
+
 // The first word that isn't an option or an option's value, so options can
 // come before the command too ("bibliora -t nkjv show john 3:16").
 const char *commandWord(int argc, char *argv[])
@@ -253,7 +302,8 @@ int main(int argc, char *argv[])
 
     // Commands run without a window, so they work over ssh and in scripts.
     const char *command = commandWord(argc, argv);
-    const bool cli = !std::strcmp(command, "show") || !std::strcmp(command, "search") || !std::strcmp(command, "define");
+    const bool cli = !std::strcmp(command, "show") || !std::strcmp(command, "search") || !std::strcmp(command, "define")
+                     || !std::strcmp(command, "skill");
     std::unique_ptr<QCoreApplication> app(cli ? new QCoreApplication(argc, argv) : new QGuiApplication(argc, argv));
 
     QCommandLineParser parser;
@@ -262,7 +312,8 @@ int main(int argc, char *argv[])
         "  bibliora [reference]               open the window (at John 3:16, a bibliora:// link, …)\n"
         "  bibliora show <reference>          print a passage: john 3:16-18, ps 23, jude\n"
         "  bibliora search <words>            print the verses that have every word\n"
-        "  bibliora define <word>             print the dictionary entry");
+        "  bibliora define <word>             print the dictionary entry\n"
+        "  bibliora skill install|remove      link the skill for AI agents, or take it away");
     parser.addHelpOption();
     parser.addVersionOption();
     parser.addOptions({
@@ -289,6 +340,8 @@ int main(int argc, char *argv[])
 
     if (cli) {
         words.removeFirst();
+        if (!std::strcmp(command, "skill"))
+            return skill(words.value(0));
         Bible bible(Paths::biblePath());
         if (!bible.isOpen())
             return fail(bible.error());
@@ -354,6 +407,19 @@ int main(int argc, char *argv[])
             delete once;
             if (qEnvironmentVariable("BIBLIORA_TIMING") == QLatin1String("exit"))
                 QTimer::singleShot(0, qApp, &QCoreApplication::quit);
+        });
+    }
+
+    if (!screenshot) {
+        QTimer::singleShot(1500, reader, [reader] {
+            if (QSettings().value(kSkillDeclined).toBool())
+                return;
+            const QString dir = Skill::installedDir(QCoreApplication::applicationDirPath());
+            if (dir.isEmpty())
+                return;
+            const Skill::Links links = Skill::link(dir, agentFolders());
+            if (!links.changed.isEmpty() && links.error.isEmpty())
+                emit reader->toast(QStringLiteral("Linked the Bibliora skill for your AI agents"));
         });
     }
 

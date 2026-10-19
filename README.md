@@ -119,6 +119,29 @@ translation (ASV, KJV, LSB, NASB or NKJV; KJV if not given). Launching
 Bibliora again brings the open window forward, at the reference if one was
 given. Its window class is `bibliora`.
 
+## Agents
+
+Bibliora comes with a skill for AI agents such as Claude Code, Codex and pi. A
+skill is a page of instructions an agent reads when a request matches it. This
+one teaches the `bibliora` command, so an agent quotes the Bible word for word
+from the translations Bibliora has instead of from memory.
+
+When Bibliora opens, it links the skill into the skills folder of each agent
+set up on the computer (`~/.claude`, `~/.codex`, `~/.pi/agent` and
+`~/.agents`), and says so the first time. `bibliora skill remove` takes the
+links away and keeps them away; `bibliora skill install` brings them back.
+
+Then ask in plain words:
+
+- "Put Romans 8:28-30 in the New King James at the top of my document."
+- "What's the verse about running the race with endurance?"
+- "Show me Esther 2:8 in all five translations."
+- "How often does propitiation appear, and where?"
+- "Every verse in the NASB with both faith and works."
+- "Check every Bible reference in this document. Does it exist, and does the
+  quoted wording match the New King James exactly?"
+- "Open Romans 1 in Bibliora."
+
 ## Install
 
 ```bash

@@ -61,7 +61,7 @@ letters (the database has none).
 
 ```
 src/app/     main.cpp (command line, single instance, screenshots), Instance
-src/core/    Paths, Toml
+src/core/    Paths, Toml, Skill (linking the agent skill into agents' folders)
 src/bible/   No UI, unit-tested: Books, Translations, Reference (parsing
              "jn 3:16" and bibliora:// links), Bible (SQLite), Markup,
              Typesetter (pages), History, Passage (the copy format), SearchQuery
@@ -70,6 +70,8 @@ src/ui/      QML-facing: Theme, Reader (the controller), PageItem (draws a
 qml/         Main.qml and the sheets (GoTo, Search, Translation, Dictionary, About,
              Keys)
 resources/fonts/  The reading faces (OFL), loaded on first use
+skills/bibliora/  The agent skill, installed with the app. It describes the
+             command line, so change it when the commands change
 tests/       Qt Test, one executable per tst_*.cpp; tst_bible needs the database
 ```
 
