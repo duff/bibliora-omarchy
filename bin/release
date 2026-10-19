@@ -1,0 +1,51 @@
+#!/bin/bash
+# Publish the version in CMakeLists.txt as a GitHub release: tag it, and
+# attach the Bible, compressed, which the Omarchy package downloads along
+# with the source. Every release carries the Bible, so the package's recipe
+# can find it by version alone.
+#
+#   bin/release [bible]    the Bible to attach; the one Bibliora reads if not given
+#
+# It checks everything first and asks before publishing.
+
+set -euo pipefail
+
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+cd "$root"
+
+version=$(sed -n 's/^project(bibliora VERSION \([0-9.]*\) .*/\1/p' CMakeLists.txt)
+tag="v$version"
+bible=${1:-${XDG_DATA_HOME:-$HOME/.local/share}/bibliora/bibles.sqlite3}
+out="$root/build-release/release"
+
+fail() { echo "bin/release: $*" >&2; exit 1; }
+
+[[ -n $version ]] || fail "no version in CMakeLists.txt"
+[[ -f $bible ]] || fail "there's no Bible at $bible"
+[[ -z $(git status --porcelain) ]] || fail "commit or stash your changes first"
+git fetch --quiet --tags origin
+[[ $(git rev-parse HEAD) == $(git rev-parse origin/master) ]] || fail "push master first"
+! git rev-parse --quiet --verify "refs/tags/$tag" >/dev/null || fail "$tag is already tagged"
+
+# The tests read the Bible being released, so a broken one stops here.
+cmake -S . -B build -G Ninja >/dev/null
+cmake --build build
+BIBLIORA_DB="$bible" ctest --test-dir build --output-on-failure
+
+rm -rf "$out"
+mkdir -p "$out"
+zstd -19 -T0 -q "$bible" -o "$out/bibles.sqlite3.zst"
+(cd "$out" && sha256sum bibles.sqlite3.zst > SHA256SUMS)
+
+echo
+echo "Ready to publish Bibliora $version:"
+echo "  tag $tag at $(git log -1 --format='%h %s')"
+echo "  $(du -h "$out/bibles.sqlite3.zst" | cut -f1) Bible, $(cut -c1-16 "$out/SHA256SUMS")…"
+read -r -p "Publish it? [y/N] " answer || true
+[[ $answer == [yY]* ]] || fail "nothing published"
+
+git tag -a "$tag" -m "Bibliora $version"
+git push --quiet origin "$tag"
+gh release create "$tag" "$out/bibles.sqlite3.zst" "$out/SHA256SUMS" \
+  --title "Bibliora $version" \
+  --notes "Install it on Omarchy with \`omarchy pkg add bibliora\`."

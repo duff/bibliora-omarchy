@@ -15,6 +15,10 @@ ctest --test-dir build --output-on-failure
 ./build/bibliora
 ```
 
+`bin/release` publishes the version in `CMakeLists.txt` as a GitHub release
+with the Bible attached, which the Omarchy package downloads. It asks before
+publishing; never run it unless the user asks for a release.
+
 `bin/relaunch` (a Stop hook in `.claude/settings.json`) builds `build-release`,
 installs to `~/.local`, and reopens the installed app on its workspace. The
 user reads the installed app, not `./build/bibliora`.
