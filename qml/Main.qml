@@ -211,22 +211,17 @@ Window {
             }
         }
 
-        // No Bible yet.
+        // The package installs the Bible with the app, so this is only for a
+        // broken install.
         Column {
             anchors.centerIn: parent
             width: Math.min(parent.width - Theme.sp(64), Theme.sp(560))
             spacing: Theme.sp(10)
             visible: !Reader.ready
 
-            Txt { text: "Bibliora needs its Bible"; size: "title"; tone: "bright"; strong: true }
+            Txt { text: "Bibliora can't open its Bible"; size: "title"; tone: "bright"; strong: true }
             Txt { width: parent.width; text: Reader.problem; tone: "dim"; wrapMode: Text.Wrap; elide: Text.ElideNone }
-            Txt {
-                width: parent.width
-                text: "Copy bibles.sqlite3 from the iOS app's project (Bibliora/Resources/DB) into ~/.local/share/bibliora/."
-                tone: "dim"
-                wrapMode: Text.Wrap
-                elide: Text.ElideNone
-            }
+            Txt { width: parent.width; text: "Reinstalling Bibliora should bring it back."; tone: "dim"; wrapMode: Text.Wrap; elide: Text.ElideNone }
         }
     }
 

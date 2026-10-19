@@ -1,5 +1,6 @@
 #include "Bible.h"
 
+#include <QFileInfo>
 #include <QUrl>
 
 #include <sqlite3.h>
@@ -55,6 +56,10 @@ QStringList commaList(const QString &s)
 Bible::Bible(const QString &path)
     : m_path(path)
 {
+    if (!QFileInfo::exists(path)) {
+        m_error = QStringLiteral("There's no Bible at %1.").arg(path);
+        return;
+    }
     // immutable=1: nothing writes the file while we read it, so SQLite can
     // skip locking and change detection altogether.
     const QByteArray uri = "file:" + QUrl::toPercentEncoding(path, "/") + "?immutable=1";

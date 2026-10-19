@@ -250,7 +250,7 @@ int main(int argc, char *argv[])
         {{"t", "translation"}, "With show or search: ASV, KJV, LSB, NASB or NKJV (KJV if not given).", "name"},
         {"json", "With show, search or define: print JSON."},
         {"limit", "With search: print at most <n> verses.", "n"},
-        {"bible", "Read the Bible from <file> instead of ~/.local/share/bibliora/bibles.sqlite3.", "file"},
+        {"bible", "Read the Bible from <file> instead of the installed one.", "file"},
     });
     QCommandLineOption screenshotOption("screenshot", "Render to <png> and exit (with -platform offscreen).", "png");
     QCommandLineOption keysOption("keys", "Type these keys before --screenshot, e.g. \"jj<Space>?\".", "keys");
@@ -272,8 +272,7 @@ int main(int argc, char *argv[])
         words.removeFirst();
         Bible bible(Paths::biblePath());
         if (!bible.isOpen())
-            return fail(bible.error().isEmpty() ? QStringLiteral("There's no Bible at %1.").arg(Paths::biblePath())
-                                                : bible.error());
+            return fail(bible.error());
         const Translation *t = translationFrom(parser);
         if (!t)
             return fail(QStringLiteral("There's no translation called “%1”. Try ASV, KJV, LSB, NASB or NKJV.")

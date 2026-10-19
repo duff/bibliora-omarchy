@@ -38,9 +38,7 @@ Reader::Reader(QObject *parent)
 
     m_bible = std::make_unique<Bible>(Paths::biblePath());
     if (!m_bible->isOpen())
-        m_problem = m_bible->error().isEmpty()
-                        ? QStringLiteral("There's no Bible at %1.").arg(Paths::biblePath())
-                        : m_bible->error();
+        m_problem = m_bible->error();
 
     QSettings s;
     m_translation = Translations::find(s.value("reading/translation").toString());
