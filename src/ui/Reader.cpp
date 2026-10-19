@@ -127,7 +127,8 @@ QVariantList Reader::translations() const
 {
     QVariantList out;
     for (const Translation &t : Translations::all())
-        out.append(QVariantMap{{"key", t.key}, {"abbrev", t.abbrev}, {"name", t.name}});
+        out.append(QVariantMap{
+            {"key", t.key}, {"abbrev", t.abbrev}, {"name", t.name}, {"notice", t.notice}, {"site", t.site}});
     return out;
 }
 

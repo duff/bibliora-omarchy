@@ -36,6 +36,7 @@ badges or verse of the day. Just reading.
 | `n` | Verse numbers on or off |
 | `f`, `F` | Next or previous reading font |
 | ctrl +, ctrl −, ctrl 0 | Bigger, smaller, or the usual text |
+| `a` | Donating, feedback, privacy, terms and copyright |
 | `?` | All of this |
 | esc | Close, or let go of the picked verses |
 
@@ -96,6 +97,12 @@ with its own reference.
 
 Literata and Source Serif adjust their optical size to the text size. LORD
 and the psalm titles are in true small caps where the face has them.
+
+## About
+
+`a` has what the iPhone app keeps under More Settings: donating, sending
+feedback (to support@bibliora.org), the privacy policy and terms of use, and
+each translation's copyright, with a link to more about it.
 
 ## Command line
 

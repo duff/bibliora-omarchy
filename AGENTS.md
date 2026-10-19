@@ -63,7 +63,8 @@ src/bible/   No UI, unit-tested: Books, Translations, Reference (parsing
              Typesetter (pages), History, Passage (the copy format), SearchQuery
 src/ui/      QML-facing: Theme, Reader (the controller), PageItem (draws a
              page into the scene graph), SearchModel, GoToModel, ReadingFonts
-qml/         Main.qml and the sheets (GoTo, Search, Translation, Dictionary, Keys)
+qml/         Main.qml and the sheets (GoTo, Search, Translation, Dictionary, About,
+             Keys)
 resources/fonts/  The reading faces (OFL), loaded on first use
 tests/       Qt Test, one executable per tst_*.cpp; tst_bible needs the database
 ```

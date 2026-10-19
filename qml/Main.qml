@@ -2,7 +2,7 @@ import QtQuick
 
 // One page of the Bible, a running head above it, and nothing else until you
 // ask: g goes somewhere, / searches, t changes translation, d looks up a word,
-// ? lists the keys.
+// a is about Bibliora, ? lists the keys.
 Window {
     id: window
 
@@ -91,6 +91,7 @@ Window {
         else if (t === "F") Reader.nextFont(-1)
         else if (t === "v") Reader.startSelection()
         else if (t === "d") define("")
+        else if (t === "a") about.show()
         else if (t === "?") keys.show()
         else return
         event.accepted = true
@@ -264,6 +265,12 @@ Window {
                 window.openSearch(word)
             }
         }
+    }
+
+    LazySheet {
+        id: about
+        function show() { if (item) item.show() }
+        sourceComponent: AboutSheet { onClosed: window.backToReading() }
     }
 
     LazySheet {

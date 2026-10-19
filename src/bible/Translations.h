@@ -11,6 +11,8 @@ struct Translation
     QString key;    // "NKJV", "NASB1995"
     QString abbrev; // "NKJV", "NASB 95"
     QString name;   // "New King James Version"
+    QString notice; // the copyright notice, as the iOS app gives it
+    QString site;   // about the translation, as the iOS app links it
 
     QString table() const { return key.toLower(); }
 };

@@ -29,6 +29,9 @@ Sheet {
             [["n"], "Verse numbers on or off"],
             [["f"], "Next reading font"],
             [["ctrl +", "ctrl −"], "Bigger or smaller text (ctrl 0: back to the start)"],
+        ]],
+        ["Bibliora", [
+            [["a"], "Donating, feedback, privacy, terms and copyright"],
             [["?"], "These keys"],
         ]],
     ]
