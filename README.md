@@ -119,11 +119,19 @@ translation (ASV, KJV, LSB, NASB or NKJV; KJV if not given). Launching
 Bibliora again brings the open window forward, at the reference if one was
 given. Its window class is `bibliora`.
 
+## Install
+
+```bash
+omarchy pkg add bibliora
+```
+
+Then open it from the apps menu (Super + Alt + Space → Bibliora).
+
 ## The Bible
 
-The translations have their own licenses, so they aren't in this
-repository. Bibliora looks for them in `~/.local/share/bibliora/`, and
-`--bible <file>` or `$BIBLIORA_DB` points at another copy.
+The package installs the translations with Bibliora. They have their own
+licenses, so they aren't in this repository. A build of your own reads the
+package's copy, and `--bible <file>` or `$BIBLIORA_DB` points at another.
 
 ## Build and run
 
@@ -135,11 +143,7 @@ ctest --test-dir build --output-on-failure
 ./build/bibliora
 ```
 
-`bin/relaunch` builds a release, installs it to `~/.local`, and when that
-changed Bibliora, reopens it where its window was. Claude Code runs it after
-every turn (`.claude/settings.json`).
-
-## Install
+To install your own build in place of the package:
 
 ```bash
 cmake -S . -B build-release -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$HOME/.local"
@@ -147,7 +151,9 @@ cmake --build build-release
 cmake --install build-release          # ~/.local/bin/bibliora + launcher entry
 ```
 
-Then launch it from the apps menu (Super + Alt + Space → Bibliora).
+`bin/relaunch` builds a release, installs it to `~/.local`, and when that
+changed Bibliora, reopens it where its window was. Claude Code runs it after
+every turn (`.claude/settings.json`).
 
 ## Settings
 
