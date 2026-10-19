@@ -153,3 +153,9 @@ Then launch it from the apps menu (Super + Alt + Space → Bibliora).
 
 Where you are, where you've been, the translation, verse numbers, the font
 and the text size are kept in `~/.config/bibliora/bibliora.conf`.
+
+## License
+
+Bibliora is released under the [MIT License](LICENSE). The reading fonts are
+under the SIL Open Font License, and the translations have their own
+copyrights, which `a` shows in the app.
