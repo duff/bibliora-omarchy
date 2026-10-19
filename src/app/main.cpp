@@ -16,6 +16,7 @@
 #include <QProcess>
 #include <QQmlApplicationEngine>
 #include <QQuickWindow>
+#include <QSet>
 #include <QSocketNotifier>
 #include <QTimer>
 
@@ -165,6 +166,24 @@ int define(Bible &bible, const QString &word)
     return 0;
 }
 
+// The first word that isn't an option or an option's value, so options can
+// come before the command too ("bibliora -t nkjv show john 3:16").
+const char *commandWord(int argc, char *argv[])
+{
+    static const QSet<QByteArray> takeValues = {"-t",    "--translation", "--limit", "--bible", "--screenshot",
+                                                "--keys", "--size",        "-platform"};
+    for (int i = 1; i < argc; ++i) {
+        const QByteArray arg(argv[i]);
+        if (arg == "--")
+            return i + 1 < argc ? argv[i + 1] : "";
+        if (!arg.startsWith('-'))
+            return argv[i];
+        if (takeValues.contains(arg))
+            ++i;
+    }
+    return "";
+}
+
 // Brings the window forward for a second launch. Qt hands the launcher's
 // activation token to the compositor; Hyprland is also asked directly, which
 // takes it to the window's workspace either way.
@@ -233,7 +252,7 @@ int main(int argc, char *argv[])
     QGuiApplication::setApplicationVersion(BIBLIORA_VERSION);
 
     // Commands run without a window, so they work over ssh and in scripts.
-    const char *command = argc > 1 ? argv[1] : "";
+    const char *command = commandWord(argc, argv);
     const bool cli = !std::strcmp(command, "show") || !std::strcmp(command, "search") || !std::strcmp(command, "define");
     std::unique_ptr<QCoreApplication> app(cli ? new QCoreApplication(argc, argv) : new QGuiApplication(argc, argv));
 
