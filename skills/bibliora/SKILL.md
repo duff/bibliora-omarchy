@@ -22,40 +22,57 @@ translations, and this text is exact.
 
 ## Commands
 
-- `bibliora show <reference> -t <translation>` prints a passage, a verse a
-  line, then `-- Romans 8:28-30, NKJV`.
-- `bibliora search <words> -t <translation>` prints every verse that has all
-  the words, in Bible order, then how many there are.
+- `bibliora show <references> -t <translations>` prints passages, a verse a
+  line, each ending `-- Romans 8:28-30, NKJV`, with a blank line between them.
+- `bibliora search <words> -t <translations>` prints every verse that has all
+  the words, in Bible order, then how many there are. `--count` prints only
+  how many, in all and in each book. `--limit <n>` prints at most n verses.
 - `bibliora define <word>` prints the dictionary entry.
 - `setsid -f bibliora <reference> >/dev/null 2>&1` opens the Bibliora window
   at a passage.
 
-Pass `--json` when you will read the result:
+## Ask once, read little
 
-- `show`: `{reference, translation, verses: [{book, chapter, verse, text}]}`
-- `search`: `{query, translation, count, verses: [{reference, book, chapter,
-  verse, text}]}`. `--limit <n>` prints fewer verses; `count` still counts them
-  all.
+Each command takes about 10 ms; what's slow is every extra command you run
+and every line you read. So:
+
+- Put everything in one command. `show` takes any number of references
+  separated by `;` (`"rom 8:28-30; jn 3:16; ps 23"`), and `-t` takes several
+  translations separated by commas (`-t kjv,nkjv`) or `-t all`.
+- Read text unless you need to process the result; it's half the size of
+  JSON.
+- For how many or where, use `search --count`, not the verses. Add `--limit`
+  when a few verses will do.
+
+`--json` prints one line:
+
+- `show`: `[{reference, translation, verses: [{chapter, verse, text}]}]`, one
+  per reference and translation. One that isn't there is
+  `{reference, translation, error}` in its place, and the rest still print.
+- `search`: `[{query, translation, count, verses: [{reference, text}]}]`, one
+  per translation; with `--count`, `books: [{book, count}]` instead of
+  `verses`. `count` is always the full number of verses.
 - `define`: `{word, pronunciations, senses: [{definition, example}], synonyms}`
 
-They exit 0 when they find something, 4 when there is nothing (no such verse,
-no matches, no entry), 2 for a mistake in the command, and 1 when the Bible
-can't be read.
+They exit 0 when everything was found, 4 when something wasn't (a reference
+that isn't there, no matches, no entry), 2 for a mistake in the command, and 1
+when the Bible can't be read. `show` exits 4 if any reference is missing, but
+still prints the others.
 
 ## Translations
 
-`-t` takes `ASV`, `KJV`, `LSB`, `NASB` (the NASB 1995) or `NKJV`, in any case.
-Without it, `show` and `search` use the KJV, so pass `-t` whenever the user
-names a translation or the document uses one. These five are all there is. If
-someone asks for another (ESV, NIV, …), say Bibliora doesn't have it and offer
-these.
+`-t` takes `ASV`, `KJV`, `LSB`, `NASB` (the NASB 1995) or `NKJV`, in any case,
+several separated by commas, or `all` (in that order). Without it, `show` and
+`search` use the KJV, so pass `-t` whenever the user names a translation or
+the document uses one. These five are all there is. If someone asks for
+another (ESV, NIV, …), say Bibliora doesn't have it and offer these.
 
 ## References
 
 `show` takes a book, a chapter, a verse, or a range of verses within one
 chapter: `jude`, `ps 23`, `john 3:16`, `rom 8:28-30`, `1 cor 13:4-7`.
 Abbreviations and any case work. A passage that runs across chapters, such as
-Genesis 1:31–2:3, takes one `show` per chapter.
+Genesis 1:31–2:3, is one reference per chapter: `"gen 1:31; gen 2:1-3"`.
 
 ## Quoting
 
@@ -82,25 +99,27 @@ say so when you aren't sure.
 
 ## Comparing translations
 
-Run `show` once for each translation (`-t asv`, `kjv`, `lsb`, `nasb`, `nkjv`)
-and set the results side by side, each with its translation's name.
+`bibliora show "esther 2:8" -t all` prints the passage in all five, each
+ending with its translation's name. Set them side by side.
 
 ## How words are used
 
-`search --json` gives `count` and every verse. Counts are verses, not
-occurrences: a verse with the word twice counts once. Group the verses by book
-when asked where. Say which translation a count is for; counts differ between
-translations, so for "the Bible" either name the translation or give each
-one's. `faith works` finds verses with both words; `"faith and works"` finds
-the phrase.
+`bibliora search propitiation --count -t all` answers how often and where in
+one command: the count in each book, for each translation. Counts are verses,
+not occurrences: a verse with the word twice counts once. Say which
+translation a count is for; counts differ between translations. Print the
+verses themselves only when they're wanted. `faith works` finds verses with
+both words; `"faith and works"` finds the phrase.
 
 ## Checking references in a document
 
-For each reference, `show` it in the translation the document uses or the
-user names; exit 4 means the reference doesn't exist. Compare any quoted
-wording with the translation exactly: words, punctuation and capitals. Report
-each problem with its reference, what the document has, and what the
-translation has. Change the document only if asked.
+Collect every reference in the document and `show` them all in one command,
+in the translation the document uses or the user names:
+`bibliora show "rom 8:28; jn 3:16; heb 12:1" -t nkjv --json`. A passage with
+`error` doesn't exist. Compare any quoted wording with the translation
+exactly: words, punctuation and capitals. Report each problem with its
+reference, what the document has, and what the translation has. Change the
+document only if asked.
 
 ## Opening the window
 

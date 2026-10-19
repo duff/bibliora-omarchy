@@ -71,6 +71,8 @@ public:
     // already in FTS5 syntax (SearchQuery::build). limit < 0: everything.
     QList<SearchHit> search(const Translation &t, const QString &ftsQuery, int limit = -1);
     int searchCount(const Translation &t, const QString &ftsQuery);
+    // How many verses match in each book that has any, in canonical order.
+    QList<std::pair<const Book *, int>> searchCountByBook(const Translation &t, const QString &ftsQuery);
 
     // The Grok dictionary, as on iOS: the exact word, then without 's, then
     // in other cases ("LORD" → "Lord" → "lord").

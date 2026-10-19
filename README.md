@@ -107,15 +107,19 @@ each translation's copyright, with a link to more about it.
 ## Command line
 
 ```bash
-bibliora                         # open the window where you left off
-bibliora john 3:16               # open it at John 3:16 (bibliora:// links work too)
-bibliora show ps 23 -t nkjv      # print a passage
-bibliora search bosom abraham    # print the verses that have every word
-bibliora define firmament        # print the dictionary entry
+bibliora                                # open the window where you left off
+bibliora john 3:16                      # open it at John 3:16 (bibliora:// links work too)
+bibliora show ps 23 -t nkjv             # print a passage
+bibliora show "rom 8:28-30; jn 3:16"    # several, separated by ;
+bibliora show esther 2:8 -t all         # in every translation
+bibliora search bosom abraham           # print the verses that have every word
+bibliora search propitiation --count    # how many, in all and in each book
+bibliora define firmament               # print the dictionary entry
 ```
 
-`--json` prints JSON from `show`, `search` and `define`, and `-t` picks the
-translation (ASV, KJV, LSB, NASB or NKJV; KJV if not given). Launching
+`-t` picks the translation (ASV, KJV, LSB, NASB or NKJV; KJV if not given),
+several separated by commas, or `all`. `--json` prints JSON on one line from
+`show`, `search` and `define`. Launching
 Bibliora again brings the open window forward, at the reference if one was
 given. Its window class is `bibliora`.
 

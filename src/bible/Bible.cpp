@@ -177,6 +177,23 @@ int Bible::searchCount(const Translation &t, const QString &ftsQuery)
     return q.step() ? q.integer(0) : 0;
 }
 
+QList<std::pair<const Book *, int>> Bible::searchCountByBook(const Translation &t, const QString &ftsQuery)
+{
+    QList<std::pair<const Book *, int>> out;
+    if (ftsQuery.isEmpty())
+        return out;
+    Use q(statement(QStringLiteral("SELECT book, count(*) FROM %1_fts WHERE text MATCH ?1 "
+                                   "GROUP BY book ORDER BY min(rowid)")
+                        .arg(t.table())));
+    if (!q)
+        return out;
+    q.bind(1, ftsQuery);
+    while (q.step())
+        if (const Book *book = Books::byKey(q.text(0)))
+            out.append({book, q.integer(1)});
+    return out;
+}
+
 DictionaryEntry Bible::define(const QString &word)
 {
     const QString w = word.trimmed();

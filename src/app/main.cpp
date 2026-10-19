@@ -18,6 +18,7 @@
 #include <QProcess>
 #include <QQmlApplicationEngine>
 #include <QQuickWindow>
+#include <QRegularExpression>
 #include <QSet>
 #include <QSettings>
 #include <QSocketNotifier>
@@ -56,89 +57,183 @@ void quitOnTermination()
 
 void print(const QString &s) { std::fputs(s.toUtf8().constData(), stdout); }
 
+// One line, so agents and scripts read as little as possible; pipe it to jq
+// to read it yourself.
 void printJson(const QJsonValue &v)
 {
     const QJsonDocument doc = v.isArray() ? QJsonDocument(v.toArray()) : QJsonDocument(v.toObject());
-    print(QString::fromUtf8(doc.toJson(QJsonDocument::Indented)));
+    print(QString::fromUtf8(doc.toJson(QJsonDocument::Compact)) + '\n');
 }
 
 int fail(const QString &message, int code = 1)
 {
+    std::fflush(stdout); // so a message lands in place among what's printed
     std::fprintf(stderr, "bibliora: %s\n", message.toUtf8().constData());
     return code;
 }
 
-const Translation *translationFrom(const QCommandLineParser &parser)
+// -t nkjv, -t kjv,nkjv or -t all; the KJV if not given. Empty for a name
+// that isn't a translation, which is put in `unknown`.
+QList<const Translation *> translationsFrom(const QCommandLineParser &parser, QString *unknown)
 {
     if (!parser.isSet("translation"))
-        return &Translations::fallback();
-    return Translations::find(parser.value("translation"));
+        return {&Translations::fallback()};
+    QList<const Translation *> out;
+    for (const QString &name : parser.value("translation").split(',', Qt::SkipEmptyParts)) {
+        QList<const Translation *> these;
+        if (name.trimmed().compare(QLatin1String("all"), Qt::CaseInsensitive) == 0) {
+            for (const Translation &t : Translations::all())
+                these.append(&t);
+        } else if (const Translation *t = Translations::find(name)) {
+            these.append(t);
+        } else {
+            *unknown = name.trimmed();
+            return {};
+        }
+        for (const Translation *t : std::as_const(these))
+            if (!out.contains(t))
+                out.append(t);
+    }
+    return out;
 }
 
-// bibliora show john 3:16-18
-int show(Bible &bible, const Translation &t, const QString &text)
+QList<VerseText> passage(Bible &bible, const Translation &t, const Reference &ref)
 {
-    const auto ref = Reference::parse(text);
-    if (!ref)
-        return fail(QStringLiteral("“%1” isn't a book, chapter or verse.").arg(text), 4);
     QList<VerseText> verses;
-    const int firstChapter = std::max(1, ref->chapter);
-    const int lastChapter = ref->chapter ? ref->chapter : ref->book->chapters;
+    const int firstChapter = std::max(1, ref.chapter);
+    const int lastChapter = ref.chapter ? ref.chapter : ref.book->chapters;
     for (int c = firstChapter; c <= lastChapter; ++c)
-        verses += bible.verses(t, *ref->book, c, ref->verse ? ref->verse : 1,
-                               ref->endVerse ? ref->endVerse : ref->verse ? ref->verse : 0);
-    if (verses.isEmpty())
-        return fail(QStringLiteral("%1 isn't in the %2.").arg(ref->label(), t.abbrev), 4);
-    if (g_json) {
-        QJsonArray list;
-        for (const VerseText &v : std::as_const(verses))
-            list.append(QJsonObject{{"book", v.book->name}, {"chapter", v.chapter}, {"verse", v.verse}, {"text", v.text}});
-        printJson(QJsonObject{{"reference", ref->label()}, {"translation", t.key}, {"verses", list}});
-        return 0;
-    }
-    int chapter = 0;
-    for (const VerseText &v : std::as_const(verses)) {
-        if (v.chapter != chapter && lastChapter > firstChapter)
-            print(QStringLiteral("%1%2 %3\n").arg(chapter ? "\n" : "", v.book->name).arg(v.chapter));
-        chapter = v.chapter;
-        print(QStringLiteral("%1 %2\n").arg(v.verse).arg(v.text));
-    }
-    print(QStringLiteral("-- %1, %2\n").arg(ref->label(), t.key));
-    return 0;
+        verses += bible.verses(t, *ref.book, c, ref.verse ? ref.verse : 1,
+                               ref.endVerse ? ref.endVerse : ref.verse ? ref.verse : 0);
+    return verses;
 }
 
-// bibliora search "bosom abraham"
-int search(Bible &bible, const Translation &t, const QString &words, int limit)
+// bibliora show "rom 8:28-30; john 3:16" -t nkjv
+//
+// Each reference in each translation, in that order. One that isn't there is
+// reported in its place and the rest still print, so a whole document's
+// references can be checked at once.
+int show(Bible &bible, const QList<const Translation *> &translations, const QString &text)
+{
+    QStringList wanted;
+    for (const QString &part : text.split(QRegularExpression(QStringLiteral("[;\n]")), Qt::SkipEmptyParts))
+        if (!part.trimmed().isEmpty())
+            wanted.append(part.trimmed());
+    if (wanted.isEmpty())
+        return fail(QStringLiteral("Say what to show, e.g. bibliora show john 3:16."), 2);
+    QJsonArray passages;
+    bool missing = false;
+    bool any = false;
+    for (const QString &one : std::as_const(wanted)) {
+        const auto ref = Reference::parse(one);
+        if (!ref) {
+            const QString problem = QStringLiteral("“%1” isn't a book, chapter or verse.").arg(one);
+            missing = true;
+            if (g_json)
+                passages.append(QJsonObject{{"reference", one}, {"error", problem}});
+            else
+                fail(problem);
+            continue;
+        }
+        for (const Translation *t : translations) {
+            const QList<VerseText> verses = passage(bible, *t, *ref);
+            if (verses.isEmpty()) {
+                const QString problem = QStringLiteral("%1 isn't in the %2.").arg(ref->label(), t->abbrev);
+                missing = true;
+                if (g_json)
+                    passages.append(QJsonObject{{"reference", ref->label()}, {"translation", t->key}, {"error", problem}});
+                else
+                    fail(problem);
+                continue;
+            }
+            if (g_json) {
+                QJsonArray list;
+                for (const VerseText &v : verses)
+                    list.append(QJsonObject{{"chapter", v.chapter}, {"verse", v.verse}, {"text", v.text}});
+                passages.append(QJsonObject{{"reference", ref->label()}, {"translation", t->key}, {"verses", list}});
+                continue;
+            }
+            if (any)
+                print("\n");
+            any = true;
+            const bool chapters = verses.first().chapter != verses.last().chapter;
+            int chapter = 0;
+            for (const VerseText &v : verses) {
+                if (v.chapter != chapter && chapters)
+                    print(QStringLiteral("%1%2 %3\n").arg(chapter ? "\n" : "", v.book->name).arg(v.chapter));
+                chapter = v.chapter;
+                print(QStringLiteral("%1 %2\n").arg(v.verse).arg(v.text));
+            }
+            print(QStringLiteral("-- %1, %2\n").arg(ref->label(), t->key));
+        }
+    }
+    if (g_json)
+        printJson(passages);
+    return missing ? 4 : 0;
+}
+
+// bibliora search "bosom abraham" -t nkjv, or with --count only how many
+// verses, in all and in each book.
+int search(Bible &bible, const QList<const Translation *> &translations, const QString &words, int limit,
+           bool countOnly)
 {
     const QString fts = SearchQuery::build(words + ' ');
     if (fts.isEmpty())
         return fail(QStringLiteral("Search for a word or two."), 2);
-    const auto hits = bible.search(t, fts, limit > 0 ? limit : -1);
-    const int total = bible.searchCount(t, fts);
     const bool tty = isatty(fileno(stdout));
-    if (g_json) {
-        QJsonArray list;
-        for (const SearchHit &h : hits) {
-            QString text = h.text;
-            text.remove(QChar(1)).remove(QChar(2));
-            list.append(QJsonObject{{"book", h.book->name}, {"chapter", h.chapter}, {"verse", h.verse},
-                                    {"reference", QStringLiteral("%1 %2:%3").arg(h.book->name).arg(h.chapter).arg(h.verse)},
-                                    {"text", text}});
+    QJsonArray results;
+    int found = 0;
+    for (const Translation *t : translations) {
+        const int total = bible.searchCount(*t, fts);
+        found += total;
+        if (!g_json && t != translations.first())
+            print("\n");
+        if (countOnly) {
+            const auto books = bible.searchCountByBook(*t, fts);
+            if (g_json) {
+                QJsonArray list;
+                for (const auto &[book, count] : books)
+                    list.append(QJsonObject{{"book", book->name}, {"count", count}});
+                results.append(QJsonObject{{"query", words}, {"translation", t->key}, {"count", total}, {"books", list}});
+                continue;
+            }
+            qsizetype width = 0;
+            for (const auto &[book, count] : books)
+                width = std::max(width, book->name.size());
+            for (const auto &[book, count] : books)
+                print(QStringLiteral("%1  %2\n").arg(book->name, -int(width)).arg(count));
+        } else {
+            const auto hits = bible.search(*t, fts, limit > 0 ? limit : -1);
+            if (g_json) {
+                QJsonArray list;
+                for (const SearchHit &h : hits) {
+                    QString text = h.text;
+                    text.remove(QChar(1)).remove(QChar(2));
+                    list.append(QJsonObject{{"reference", QStringLiteral("%1 %2:%3").arg(h.book->name).arg(h.chapter).arg(h.verse)},
+                                            {"text", text}});
+                }
+                results.append(QJsonObject{{"query", words}, {"translation", t->key}, {"count", total}, {"verses", list}});
+                continue;
+            }
+            for (const SearchHit &h : hits) {
+                QString text = h.text;
+                text.replace(QChar(1), tty ? QStringLiteral("\x1b[1m") : QString());
+                text.replace(QChar(2), tty ? QStringLiteral("\x1b[0m") : QString());
+                print(QStringLiteral("%1 %2:%3  %4\n").arg(h.book->name).arg(h.chapter).arg(h.verse).arg(text));
+            }
+            if (hits.size() < total) {
+                print(QStringLiteral("%1 %2 in the %3 (%4 shown)\n")
+                          .arg(total)
+                          .arg(total == 1 ? "verse" : "verses", t->abbrev)
+                          .arg(hits.size()));
+                continue;
+            }
         }
-        printJson(QJsonObject{{"query", words}, {"translation", t.key}, {"count", total}, {"verses", list}});
-        return 0;
+        print(QStringLiteral("%1 %2 in the %3\n").arg(total).arg(total == 1 ? "verse" : "verses", t->abbrev));
     }
-    for (const SearchHit &h : hits) {
-        QString text = h.text;
-        text.replace(QChar(1), tty ? QStringLiteral("\x1b[1m") : QString());
-        text.replace(QChar(2), tty ? QStringLiteral("\x1b[0m") : QString());
-        print(QStringLiteral("%1 %2:%3  %4\n").arg(h.book->name).arg(h.chapter).arg(h.verse).arg(text));
-    }
-    print(QStringLiteral("%1 %2 in the %3%4\n")
-              .arg(total)
-              .arg(total == 1 ? "verse" : "verses", t.abbrev,
-                   hits.size() < total ? QStringLiteral(" (%1 shown)").arg(hits.size()) : QString()));
-    return total ? 0 : 4;
+    if (g_json)
+        printJson(results);
+    return found ? 0 : 4;
 }
 
 // bibliora define firmament
@@ -310,16 +405,19 @@ int main(int argc, char *argv[])
     parser.setApplicationDescription(
         "Read the Bible.\n\n"
         "  bibliora [reference]               open the window (at John 3:16, a bibliora:// link, …)\n"
-        "  bibliora show <reference>          print a passage: john 3:16-18, ps 23, jude\n"
+        "  bibliora show <references>         print passages: john 3:16-18, ps 23, jude; several with ;\n"
         "  bibliora search <words>            print the verses that have every word\n"
         "  bibliora define <word>             print the dictionary entry\n"
         "  bibliora skill install|remove      link the skill for AI agents, or take it away");
     parser.addHelpOption();
     parser.addVersionOption();
     parser.addOptions({
-        {{"t", "translation"}, "With show or search: ASV, KJV, LSB, NASB or NKJV (KJV if not given).", "name"},
-        {"json", "With show, search or define: print JSON."},
-        {"limit", "With search: print at most <n> verses.", "n"},
+        {{"t", "translation"},
+         "With show or search: ASV, KJV, LSB, NASB or NKJV, several with commas, or all (KJV if not given).",
+         "names"},
+        {"json", "With show, search or define: print JSON, on one line."},
+        {"limit", "With search: print at most <n> verses from each translation.", "n"},
+        {"count", "With search: print how many verses, in all and in each book, not the verses."},
         {"bible", "Read the Bible from <file> instead of the installed one.", "file"},
     });
     QCommandLineOption screenshotOption("screenshot", "Render to <png> and exit (with -platform offscreen).", "png");
@@ -345,10 +443,11 @@ int main(int argc, char *argv[])
         Bible bible(Paths::biblePath());
         if (!bible.isOpen())
             return fail(bible.error());
-        const Translation *t = translationFrom(parser);
-        if (!t)
-            return fail(QStringLiteral("There's no translation called “%1”. Try ASV, KJV, LSB, NASB or NKJV.")
-                            .arg(parser.value("translation")),
+        QString unknown;
+        const QList<const Translation *> translations = translationsFrom(parser, &unknown);
+        if (translations.isEmpty())
+            return fail(QStringLiteral("There's no translation called “%1”. Try ASV, KJV, LSB, NASB, NKJV or all.")
+                            .arg(unknown),
                         2);
         if (words.isEmpty())
             return fail(QStringLiteral("Say what to %1, e.g. bibliora %1 %2.")
@@ -357,9 +456,9 @@ int main(int argc, char *argv[])
                                                                             : "firmament"),
                         2);
         if (!std::strcmp(command, "show"))
-            return show(bible, *t, words.join(' '));
+            return show(bible, translations, words.join(' '));
         if (!std::strcmp(command, "search"))
-            return search(bible, *t, words.join(' '), parser.value("limit").toInt());
+            return search(bible, translations, words.join(' '), parser.value("limit").toInt(), parser.isSet("count"));
         return define(bible, words.join(' '));
     }
 

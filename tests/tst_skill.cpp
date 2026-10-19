@@ -75,7 +75,8 @@ private slots:
         QVERIFY(file.open(QIODevice::ReadOnly));
         const QString skill = QString::fromUtf8(file.readAll());
         QVERIFY(skill.startsWith("---\nname: bibliora\ndescription: >\n"));
-        for (const char *command : {"bibliora show", "bibliora search", "bibliora define", "setsid -f bibliora"})
+        for (const char *command : {"bibliora show", "bibliora search", "bibliora define", "setsid -f bibliora",
+                                    "-t all", "--count", "--limit", "--json"})
             QVERIFY2(skill.contains(QLatin1String(command)), command);
     }
 };

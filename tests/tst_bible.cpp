@@ -92,6 +92,15 @@ private slots:
                     < std::tie(love[i].book->number, love[i].chapter, love[i].verse));
     }
 
+    void countByBook()
+    {
+        const auto books = m_bible->searchCountByBook(*Translations::find("NASB"), SearchQuery::build("propitiation "));
+        QCOMPARE(books.size(), 3);
+        QCOMPARE(books.at(0).first->name, QStringLiteral("Romans"));
+        QCOMPARE(books.at(2).first->name, QStringLiteral("1 John"));
+        QCOMPARE(books.at(2).second, 2);
+    }
+
     void dictionary()
     {
         const DictionaryEntry e = m_bible->define("firmament");
