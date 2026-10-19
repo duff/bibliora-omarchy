@@ -12,4 +12,10 @@ namespace SearchQuery {
 // to look for.
 QString build(const QString &typed);
 
+// A word and its other forms, roughly: an ending like -ing, -eth or -s comes
+// off and what's left matches as the start of a word ("gathering" is
+// "gather"*). How often the Bible uses a word's family says better than the
+// word alone how unusual it is. Empty for a word too short to say.
+QString family(const QString &word);
+
 } // namespace SearchQuery

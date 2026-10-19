@@ -5,8 +5,9 @@
 // Draws Reader's current page: the lines Typesetter placed, straight into the
 // scene graph as glyphs, with the selection and a found verse behind them.
 //
-// A click on a verse selects it (Shift extends, Ctrl adds), a double click on
-// a word asks for its dictionary entry, and the wheel turns pages.
+// A right click or a double click on a word asks for its dictionary entry,
+// ctrl-click and shift-click pick verses, and the wheel turns pages. A plain
+// click does nothing but let go of picked verses.
 class PageItem : public QQuickItem
 {
     Q_OBJECT

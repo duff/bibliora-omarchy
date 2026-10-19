@@ -63,6 +63,8 @@ public:
 
     Hit hitTest(int page, QPointF p) const;
     QString wordAt(int page, QPointF p) const;
+    // Every word on a page, once each (whatever its case), in reading order.
+    QStringList wordsOn(int page) const;
     // Rectangles covering the given verses on a page, one per line they touch.
     QList<QRectF> verseRects(int page, const QSet<int> &verses) const;
 

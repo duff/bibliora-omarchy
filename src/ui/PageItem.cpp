@@ -37,7 +37,7 @@ PageItem::PageItem(QQuickItem *parent)
     : QQuickItem(parent)
 {
     setFlag(ItemHasContents);
-    setAcceptedMouseButtons(Qt::LeftButton);
+    setAcceptedMouseButtons(Qt::LeftButton | Qt::RightButton);
     if (Reader *reader = Reader::instance())
         connect(reader, &Reader::pageContentChanged, this, &QQuickItem::update);
     if (Theme *theme = Theme::instance())
@@ -107,33 +107,34 @@ QSGNode *PageItem::updatePaintNode(QSGNode *old, UpdatePaintNodeData *)
 
 void PageItem::mousePressEvent(QMouseEvent *event)
 {
+    // Taken, even where it does nothing, so a double click comes here too.
+    event->accept();
     Reader *reader = Reader::instance();
     const auto layout = reader ? reader->layout() : nullptr;
-    if (!layout) {
-        event->ignore();
+    if (!layout)
+        return;
+    if (event->button() == Qt::RightButton) {
+        const QString word = layout->wordAt(reader->page(), event->position());
+        if (!word.isEmpty())
+            emit wordRequested(word);
         return;
     }
     const auto hit = layout->hitTest(reader->page(), event->position());
-    if (hit.verse <= 0) {
-        event->ignore(); // the margins: QML turns the page
-        return;
-    }
-    reader->clickVerse(hit.verse, int(event->modifiers()));
-    event->accept();
+    if (hit.verse > 0 && (event->modifiers() & (Qt::ControlModifier | Qt::ShiftModifier)))
+        reader->clickVerse(hit.verse, int(event->modifiers()));
+    else if (reader->selecting())
+        reader->clearSelection(); // a plain click lets go
 }
 
 void PageItem::mouseDoubleClickEvent(QMouseEvent *event)
 {
     Reader *reader = Reader::instance();
     const auto layout = reader ? reader->layout() : nullptr;
-    if (!layout)
+    if (!layout || event->button() != Qt::LeftButton)
         return;
     const QString word = layout->wordAt(reader->page(), event->position());
-    if (word.isEmpty())
-        return;
-    // The first click picked the verse; a double click is about the word.
-    reader->clearSelection();
-    emit wordRequested(word);
+    if (!word.isEmpty())
+        emit wordRequested(word);
 }
 
 void PageItem::wheelEvent(QWheelEvent *event)

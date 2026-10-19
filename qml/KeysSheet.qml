@@ -17,10 +17,10 @@ Sheet {
             [["g"], "Go to a book, chapter or verse (also :)"],
             [["c"], "This book's chapters"],
             [["/"], "Search the translation you're reading"],
-            [["d"], "Look up a word (or double-click it)"],
+            [["d"], "Look up a word on the page (or right-click it)"],
         ]],
         ["Copying", [
-            [["v"], "Pick verses, from the top of the page (or click one)"],
+            [["v"], "Pick verses, from the top of the page (or ctrl-click one)"],
             [["j", "k"], "More or fewer verses"],
             [["y"], "Copy them, with where they're from"],
         ]],

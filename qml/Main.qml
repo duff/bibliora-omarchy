@@ -1,7 +1,8 @@
 import QtQuick
 
 // One page of the Bible, a running head above it, and nothing else until you
-// ask: g goes somewhere, / searches, t changes translation, ? lists the keys.
+// ask: g goes somewhere, / searches, t changes translation, d looks up a word,
+// ? lists the keys.
 Window {
     id: window
 
@@ -103,7 +104,8 @@ Window {
         Keys.onPressed: (event) => window.readerKey(event)
 
         // Clicks beside the page turn it; the mouse's side buttons go back
-        // and forward; the wheel turns pages anywhere.
+        // and forward; the wheel turns pages anywhere. Clicks on the page are
+        // the page's own (PageItem).
         MouseArea {
             anchors.fill: parent
             acceptedButtons: Qt.LeftButton | Qt.BackButton | Qt.ForwardButton

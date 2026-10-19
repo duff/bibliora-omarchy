@@ -30,6 +30,25 @@ private slots:
         QFETCH(QString, fts);
         QCOMPARE(SearchQuery::build(typed), fts);
     }
+
+    void family_data()
+    {
+        QTest::addColumn<QString>("word");
+        QTest::addColumn<QString>("fts");
+        QTest::newRow("plain") << "firmament" << "\"firmament\"*";
+        QTest::newRow("-ing") << "gathering" << "\"gather\"*";
+        QTest::newRow("-s") << "Seasons" << "\"season\"*";
+        QTest::newRow("-eth") << "speaketh" << "\"speak\"*";
+        QTest::newRow("too short to cut") << "seas" << "\"seas\"*";
+        QTest::newRow("too short to say") << "a" << "";
+    }
+
+    void family()
+    {
+        QFETCH(QString, word);
+        QFETCH(QString, fts);
+        QCOMPARE(SearchQuery::family(word), fts);
+    }
 };
 
 QTEST_GUILESS_MAIN(TestSearchQuery)

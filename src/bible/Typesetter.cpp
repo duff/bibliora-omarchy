@@ -7,6 +7,15 @@
 
 namespace {
 
+// "LORD’s" looks up "LORD".
+QString lookupForm(QString word)
+{
+    for (const QString &suffix : {QStringLiteral("’s"), QStringLiteral("'s")})
+        if (word.endsWith(suffix))
+            word.chop(suffix.size());
+    return word.trimmed();
+}
+
 QFont numberFont(const TypeStyle &style)
 {
     QFont f = style.font;
@@ -122,12 +131,34 @@ QString ChapterLayout::wordAt(int page, QPointF p) const
     int end = finder.toNextBoundary();
     if (start < 0 || end < 0)
         return {};
-    QString word = text.mid(start, end - start);
-    // "LORD’s" looks up "LORD".
-    for (const QString &suffix : {QStringLiteral("’s"), QStringLiteral("'s")})
-        if (word.endsWith(suffix))
-            word.chop(suffix.size());
-    return word.trimmed();
+    return lookupForm(text.mid(start, end - start));
+}
+
+QStringList ChapterLayout::wordsOn(int page) const
+{
+    QStringList out;
+    if (page < 0 || page >= pages.size())
+        return out;
+    QSet<QString> seen;
+    for (const Piece &piece : pages.at(page).pieces) {
+        const QString &text = chapter.blocks.at(piece.block).text;
+        const QTextLayout *layout = layouts.at(piece.block).get();
+        const QTextLine last = layout->lineAt(piece.lineStart + piece.lineCount - 1);
+        const int to = last.textStart() + last.textLength();
+        QTextBoundaryFinder finder(QTextBoundaryFinder::Word, text);
+        int from = layout->lineAt(piece.lineStart).textStart();
+        finder.setPosition(from);
+        for (int end = finder.toNextBoundary(); end > 0 && from < to; from = end, end = finder.toNextBoundary()) {
+            if (!text.at(from).isLetter())
+                continue; // spaces, punctuation, the hidden verse numbers
+            const QString word = lookupForm(text.mid(from, end - from));
+            if (!seen.contains(word.toLower())) {
+                seen.insert(word.toLower());
+                out.append(word);
+            }
+        }
+    }
+    return out;
 }
 
 QList<QRectF> ChapterLayout::verseRects(int page, const QSet<int> &verses) const

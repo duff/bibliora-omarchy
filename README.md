@@ -28,8 +28,8 @@ badges or verse of the day. Just reading.
 | `g` or `:` | Go to a book, chapter or verse |
 | `c` | This book's chapters |
 | `/` (or ctrl f) | Search the translation you're reading |
-| `d` | Look up a word (or double-click it on the page) |
-| `v` | Pick verses, starting at the top of the page (or click a verse) |
+| `d` | Look up a word on the page (or right-click it) |
+| `v` | Pick verses, starting at the top of the page (or ctrl-click a verse) |
 | `j` `k` while picking | More or fewer verses (`J` `K` by five) |
 | `y`, enter or ctrl c while picking | Copy them, with where they're from |
 | `t` | Translation (then 1–5) |
@@ -40,8 +40,9 @@ badges or verse of the day. Just reading.
 | esc | Close, or let go of the picked verses |
 
 The mouse works too: click beside the page to turn it, scroll to turn it, and
-click the book, chapter or translation at the top to change them. Shift-click
-picks a run of verses and ctrl-click adds one.
+click the book, chapter or translation at the top to change them. Right-click
+or double-click a word to look it up. Ctrl-click picks a verse and adds more,
+and shift-click picks the run up to one. A plain click on the page lets go.
 
 ### Go to
 
@@ -61,6 +62,14 @@ shepherd. Put words in quotes for a phrase. Matches are in Bible order with
 the words that matched in the theme's accent. A search that reads as a
 reference (`gen 9`) also offers to go there. Esc keeps the search for next
 time; with the field empty you get your past searches.
+
+### Looking up a word
+
+`d` opens the dictionary (the iPhone app's, written with Grok) on the words
+of the page you're reading, the ones the Bible uses least first, so the word
+you're after is usually at the top: on Genesis 1 that's firmament. ↑ ↓ or tab
+move through them and the entry follows. Type to narrow them or to look up any
+other word. Enter searches for the verses that use it.
 
 ### Copying
 

@@ -80,4 +80,21 @@ QString build(const QString &typed)
     return joined;
 }
 
+QString family(const QString &word)
+{
+    QString stem = words(word).join(QString());
+    if (stem.size() < 3)
+        return {};
+    for (const QString &ending : {QStringLiteral("ings"), QStringLiteral("ing"), QStringLiteral("edst"),
+                                  QStringLiteral("eth"), QStringLiteral("est"), QStringLiteral("ies"),
+                                  QStringLiteral("ed"), QStringLiteral("es"), QStringLiteral("er"),
+                                  QStringLiteral("s")}) {
+        if (stem.endsWith(ending) && stem.size() - ending.size() >= 4) {
+            stem.chop(ending.size());
+            break;
+        }
+    }
+    return phrase({stem}) + '*';
+}
+
 } // namespace SearchQuery

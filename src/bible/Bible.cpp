@@ -212,3 +212,21 @@ DictionaryEntry Bible::define(const QString &word)
     }
     return {};
 }
+
+QStringList Bible::dictionaryWords(const QString &prefix, int limit)
+{
+    QStringList out;
+    QString pattern = prefix.trimmed();
+    if (pattern.isEmpty())
+        return out;
+    pattern.replace('\\', QStringLiteral("\\\\")).replace('%', QStringLiteral("\\%")).replace('_', QStringLiteral("\\_"));
+    Use q(statement(QStringLiteral("SELECT word FROM words_grok WHERE word LIKE ?1 ESCAPE '\\' "
+                                   "ORDER BY lower(word), word LIMIT ?2")));
+    if (!q)
+        return out;
+    q.bind(1, pattern + '%');
+    q.bind(2, limit);
+    while (q.step())
+        out.append(q.text(0));
+    return out;
+}

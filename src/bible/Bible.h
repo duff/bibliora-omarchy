@@ -75,6 +75,9 @@ public:
     // The Grok dictionary, as on iOS: the exact word, then without 's, then
     // in other cases ("LORD" → "Lord" → "lord").
     DictionaryEntry define(const QString &word);
+    // The dictionary's words that start with `prefix`, whatever its case, in
+    // alphabetical order.
+    QStringList dictionaryWords(const QString &prefix, int limit);
 
 private:
     sqlite3_stmt *statement(const QString &sql);

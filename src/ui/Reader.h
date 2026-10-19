@@ -137,6 +137,7 @@ public:
     // Picking verses: `v` starts at the top of the page, j/k move the end.
     Q_INVOKABLE void startSelection();
     Q_INVOKABLE void moveCursor(int step);
+    // Ctrl-click adds a verse or drops it; shift-click runs on to it.
     Q_INVOKABLE void clickVerse(int verse, int modifiers);
     Q_INVOKABLE void copySelection();
     Q_INVOKABLE void clearSelection();
@@ -145,6 +146,12 @@ public:
     // translation use it: {word, pronunciation, senses: [{definition,
     // example}], synonyms, verses}, or {} if there is none.
     Q_INVOKABLE QVariantMap define(const QString &word);
+    // Words to offer for looking up. With nothing typed, the words on this
+    // page that have an entry, the least used first (by family: see
+    // SearchQuery::family);
+    // otherwise the word typed, then this page's words and the dictionary's
+    // that start with it.
+    Q_INVOKABLE QStringList dictionaryWords(const QString &typed);
 
 signals:
     void placeChanged();
@@ -200,6 +207,9 @@ private:
     bool m_selecting = false;
     QSet<VerseKey> m_selection;
     VerseKey m_anchor, m_cursor;
+
+    QString m_pageWordsFor; // the page and layout they're from
+    QStringList m_pageWords;
 
     VerseKey m_flash;
     qreal m_flashStrength = 0;

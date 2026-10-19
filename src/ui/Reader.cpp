@@ -11,6 +11,8 @@
 #include <QGuiApplication>
 #include <QSettings>
 
+#include <algorithm>
+#include <climits>
 #include <cmath>
 
 namespace {
@@ -642,25 +644,15 @@ void Reader::clickVerse(int verse, int modifiers)
         setSelection(QSet<VerseKey>(verses.begin(), verses.end()));
         return;
     }
-    if (modifiers & Qt::ControlModifier) {
-        QSet<VerseKey> verses = m_selection;
-        if (verses.contains(key))
-            verses.remove(key);
-        else
-            verses.insert(key);
-        m_anchor = m_cursor = key;
-        m_selecting = true;
-        setSelection(verses);
-        return;
-    }
-    // A plain click picks one verse; clicking it again lets go.
-    if (m_selection.size() == 1 && m_selection.contains(key)) {
-        clearSelection();
-        return;
-    }
+    // Otherwise it adds the verse, or drops it if it's already picked.
+    QSet<VerseKey> verses = m_selecting ? m_selection : QSet<VerseKey>{};
+    if (verses.contains(key))
+        verses.remove(key);
+    else
+        verses.insert(key);
     m_anchor = m_cursor = key;
     m_selecting = true;
-    setSelection({key});
+    setSelection(verses);
 }
 
 void Reader::copySelection()
@@ -702,6 +694,50 @@ QVariantMap Reader::define(const QString &word)
             {"synonyms", e.synonyms.join(QStringLiteral(", "))},
             {"verses", verses},
             {"translation", m_translation->abbrev}};
+}
+
+QStringList Reader::dictionaryWords(const QString &typed)
+{
+    if (!ready() || !m_layout)
+        return {};
+    // The layout changes with the font and its size, and with it the page.
+    const QString here = QStringLiteral("%1 %2 %3 %4 %5")
+                             .arg(m_translation->key, m_book->key)
+                             .arg(m_chapter)
+                             .arg(m_page)
+                             .arg(quintptr(m_layout.get()));
+    if (here != m_pageWordsFor) {
+        QList<std::pair<int, QString>> ranked;
+        QSet<QString> seen;
+        for (const QString &w : m_layout->wordsOn(m_page)) {
+            const DictionaryEntry e = m_bible->define(w);
+            if (!e.isValid() || seen.contains(e.word))
+                continue;
+            seen.insert(e.word);
+            const QString family = SearchQuery::family(e.word);
+            const int uses = family.isEmpty() ? INT_MAX : m_bible->searchCount(*m_translation, family);
+            ranked.append({uses, e.word});
+        }
+        std::stable_sort(ranked.begin(), ranked.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
+        m_pageWords.clear();
+        for (const auto &[count, word] : std::as_const(ranked))
+            m_pageWords.append(word);
+        m_pageWordsFor = here;
+    }
+
+    const QString t = typed.trimmed();
+    if (t.isEmpty())
+        return m_pageWords;
+    QStringList out;
+    const DictionaryEntry exact = m_bible->define(t);
+    if (exact.isValid())
+        out.append(exact.word);
+    for (const QString &w : std::as_const(m_pageWords))
+        if (w.startsWith(t, Qt::CaseInsensitive))
+            out.append(w);
+    out.append(m_bible->dictionaryWords(t, 50));
+    out.removeDuplicates();
+    return out;
 }
 
 // ------------------------------------------------------------------ saving
