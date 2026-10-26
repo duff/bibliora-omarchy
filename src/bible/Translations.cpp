@@ -16,7 +16,7 @@ const QList<Translation> &all()
         {QStringLiteral("NASB1995"), QStringLiteral("NASB 95"), QStringLiteral("New American Standard Bible 1995"),
          QStringLiteral("New American Standard Bible® (NASB), Copyright © 1960, 1971, 1977, 1995 by The Lockman "
                         "Foundation. Used by permission. All rights reserved. www.lockman.org"),
-         QStringLiteral("https://www.lockman.org/nasb-bible/")},
+         QStringLiteral("https://www.lockman.org/about-nasb-1995/")},
         {QStringLiteral("NKJV"), QStringLiteral("NKJV"), QStringLiteral("New King James Version"),
          QStringLiteral("New King James Version®, Copyright © 1982, Thomas Nelson. All rights reserved. "
                         "www.thomasnelsonbibles.com"),
