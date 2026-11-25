@@ -477,8 +477,10 @@ int main(int argc, char *argv[])
         if (!window)
             return;
         present(window, token);
-        if (!where.isEmpty() && Reader::instance())
+        if (!where.isEmpty() && Reader::instance()) {
+            QMetaObject::invokeMethod(window, "closeSheets");
             Reader::instance()->goTo(where);
+        }
     };
     if (parser.isSet(replaceOption))
         instance.takeOver(raise);

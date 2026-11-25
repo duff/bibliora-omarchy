@@ -418,10 +418,15 @@ QVariantList Reader::historyEntries() const
 {
     QVariantList out;
     const auto &places = m_history.places();
+    const auto entry = [&places](int i, bool forward) {
+        const Place &p = places.at(i);
+        return QVariantMap{
+            {"index", i}, {"label", p.label()}, {"forward", forward}, {"book", p.book}, {"chapter", p.chapter}};
+    };
     for (int i : m_history.backIndices())
-        out.append(QVariantMap{{"index", i}, {"label", places.at(i).label()}, {"forward", false}});
+        out.append(entry(i, false));
     for (int i : m_history.forwardIndices())
-        out.append(QVariantMap{{"index", i}, {"label", places.at(i).label()}, {"forward", true}});
+        out.append(entry(i, true));
     return out;
 }
 

@@ -47,6 +47,14 @@ Window {
         dictionary.show(word)
     }
 
+    // A reference handed over by another launch: whatever sheet is up was
+    // for the page you were on, so it goes.
+    function closeSheets() {
+        for (const sheet of [goTo, search, translations, dictionary, about, keys])
+            if (sheet.item)
+                sheet.item.close()
+    }
+
     // Every key the page answers to. Sheets handle their own.
     function readerKey(event) {
         const ctrl = event.modifiers & Qt.ControlModifier

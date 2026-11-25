@@ -84,6 +84,8 @@ void GoToModel::rebuild()
                                           {"detail", e.value("forward").toBool() ? QStringLiteral("ahead")
                                                                                  : QStringLiteral("back")},
                                           {"index", e.value("index")},
+                                          {"book", e.value("book")},
+                                          {"chapter", e.value("chapter")},
                                           {"target", e.value("label")}});
             }
         }
@@ -142,7 +144,17 @@ bool GoToModel::activate(int row)
         return false;
     const QString kind = r.value("kind").toString();
     if (kind == QLatin1String("recent")) {
-        reader->goToHistory(r.value("index").toInt());
+        // History can change while the list is up (a second launch hands over
+        // a reference), and its indices with it, so go by the chapter. A
+        // chapter no longer behind or ahead is the one you're at.
+        const int book = r.value("book").toInt(), chapter = r.value("chapter").toInt();
+        for (const QVariant &v : reader->historyEntries()) {
+            const QVariantMap e = v.toMap();
+            if (e.value("book").toInt() == book && e.value("chapter").toInt() == chapter) {
+                reader->goToHistory(e.value("index").toInt());
+                break;
+            }
+        }
         return true;
     }
     if (kind == QLatin1String("book") && r.value("chapters").toInt() > 1) {

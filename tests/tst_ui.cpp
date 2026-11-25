@@ -1,6 +1,7 @@
 // The window's controllers, driven as the keys and the mouse drive them,
 // against the real Bible. Settings go to Qt's test folder, not the user's.
 #include "Paths.h"
+#include "GoToModel.h"
 #include "Reader.h"
 #include "SearchModel.h"
 
@@ -176,6 +177,29 @@ private slots:
         reader->clearSelection();
         QVERIFY(!reader->selecting());
         QCOMPARE(reader->selectedCount(), 0);
+    }
+
+    // ------------------------------------------------ go to
+
+    // History changes under an open Go to (a reference handed over by a second
+    // launch): its recent rows still go where they say.
+    void recentRowsSurviveAHistoryChange()
+    {
+        QVERIFY(reader->goTo("ex 3")); // history: Genesis 1, Exodus 3, Leviticus 4
+        QVERIFY(reader->goTo("lev 4"));
+        GoToModel goTo;
+        goTo.reset();
+        const auto rowFor = [&](const QString &label) {
+            for (int i = 0; i < goTo.rows().size(); ++i)
+                if (goTo.rows().at(i).toMap().value("label") == label)
+                    return i;
+            return -1;
+        };
+        const int exodus = rowFor("Exodus 3");
+        QVERIFY(exodus >= 0);
+        QVERIFY(reader->goTo("gen 1")); // Exodus 3, Leviticus 4, Genesis 1
+        QVERIFY(goTo.activate(exodus));
+        QCOMPARE(here(), QString("Exodus 3"));
     }
 
     // ------------------------------------------------ search

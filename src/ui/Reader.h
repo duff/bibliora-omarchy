@@ -126,7 +126,8 @@ public:
     Q_INVOKABLE void back();
     Q_INVOKABLE void forward();
     Q_INVOKABLE void goToHistory(int index);
-    // History nearest first: [{index, label, forward}] behind you, then ahead.
+    // History nearest first: [{index, label, forward, book, chapter}] behind
+    // you, then ahead.
     Q_INVOKABLE QVariantList historyEntries() const;
 
     Q_INVOKABLE void setTranslation(const QString &key);
