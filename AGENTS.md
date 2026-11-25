@@ -72,7 +72,9 @@ qml/         Main.qml and the sheets (GoTo, Search, Translation, Dictionary, Abo
 resources/fonts/  The reading faces (OFL), loaded on first use
 skills/bibliora/  The agent skill, installed with the app. It describes the
              command line, so change it when the commands change
-tests/       Qt Test, one executable per tst_*.cpp; tst_bible needs the database
+tests/       Qt Test, one executable per tst_*.cpp; tst_bible, tst_cli and
+             tst_ui need the database; tst_ui drives Reader and the models
+             without QML.
 ```
 
 Sources and QML are globbed; adding a file needs only a re-run of

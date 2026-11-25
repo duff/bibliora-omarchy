@@ -44,6 +44,13 @@ public:
         int firstVerse = 0; // the first verse that starts here (or runs on from before, if none does)
         int lastVerse = 0;
     };
+    // A place in the text, set by moving and kept through laying out again:
+    // so many characters into a verse, counted across its lines and blocks.
+    struct Spot
+    {
+        int verse = 1;
+        int offset = 0;
+    };
     struct Hit
     {
         int block = -1;
@@ -58,6 +65,8 @@ public:
 
     int pageCount() const { return int(pages.size()); }
     int pageOfVerse(int verse) const; // the page it starts on
+    Spot spotAt(int page) const;      // where a page's text starts
+    int pageOf(const Spot &spot) const; // the page that shows that character
     QHash<int, int> verseStartPage;
     QList<int> versesOnPage(int page) const;
 

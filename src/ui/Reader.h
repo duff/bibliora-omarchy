@@ -187,7 +187,11 @@ private:
     const Book *m_book = nullptr;
     int m_chapter = 1;
     int m_page = 0;
-    int m_pendingVerse = 1; // where to open once there's a page to lay out
+    // The place the page keeps in view: set by moving (a jump's verse, or
+    // where a turned-to page starts), never by laying out again, so a resize,
+    // a theme or a font change shows the same text. It is also where to open
+    // before there's a page to lay out.
+    ChapterLayout::Spot m_keep;
     std::shared_ptr<ChapterLayout> m_layout;
     QHash<QString, std::shared_ptr<ChapterLayout>> m_cache;
     QStringList m_cacheOrder;

@@ -65,6 +65,16 @@ foreach(test_src ${BIBLIORA_TESTS})
         add_dependencies(${test_name} bibliora)
         target_compile_definitions(${test_name} PRIVATE BIBLIORA_BINARY="$<TARGET_FILE:bibliora>")
     endif()
+    # tst_ui tests the window's controllers (Reader, SearchModel, GoToModel)
+    # without QML, so it builds them in with the fonts they read in.
+    if(test_name STREQUAL "tst_ui")
+        target_sources(${test_name} PRIVATE src/ui/Reader.cpp src/ui/Reader.h src/ui/SearchModel.cpp
+            src/ui/SearchModel.h src/ui/GoToModel.cpp src/ui/GoToModel.h src/ui/Theme.cpp src/ui/Theme.h
+            src/ui/ReadingFonts.cpp src/ui/ReadingFonts.h)
+        target_include_directories(${test_name} PRIVATE src/ui)
+        target_link_libraries(${test_name} PRIVATE Qt6::Qml Qt6::Concurrent)
+        qt_add_resources(${test_name} fonts PREFIX /qt/qml/Bibliora FILES ${BIBLIORA_FONTS})
+    endif()
     add_test(NAME ${test_name} COMMAND ${test_name})
     set_tests_properties(${test_name} PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endforeach()

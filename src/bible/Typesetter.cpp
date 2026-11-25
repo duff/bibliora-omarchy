@@ -70,6 +70,51 @@ int ChapterLayout::pageOfVerse(int verse) const
     return best;
 }
 
+ChapterLayout::Spot ChapterLayout::spotAt(int page) const
+{
+    if (page < 0 || page >= pages.size())
+        return {};
+    for (const Piece &piece : pages.at(page).pieces) {
+        const Markup::Block &b = chapter.blocks.at(piece.block);
+        const QTextLayout *layout = layouts.at(piece.block).get();
+        const int from = layout->lineAt(piece.lineStart).textStart();
+        for (const Markup::VerseRange &v : b.verses) {
+            if (v.end <= from)
+                continue;
+            // The verse's text in the blocks before this one counts too.
+            int before = 0;
+            for (int bi = 0; bi < piece.block; ++bi)
+                for (const Markup::VerseRange &w : chapter.blocks.at(bi).verses)
+                    if (w.verse == v.verse)
+                        before += w.end - w.start;
+            return {v.verse, before + std::max(0, from - v.start)};
+        }
+    }
+    return {std::max(1, pages.at(page).firstVerse), 0};
+}
+
+int ChapterLayout::pageOf(const Spot &spot) const
+{
+    const auto pageAt = [this](int block, int pos) {
+        const int line = std::max(0, layouts.at(block)->lineForTextPosition(pos).lineNumber());
+        return places.at(block).at(line).page;
+    };
+    int left = spot.offset;
+    int lastBlock = -1, lastPos = 0;
+    for (int bi = 0; bi < chapter.blocks.size(); ++bi)
+        for (const Markup::VerseRange &v : chapter.blocks.at(bi).verses) {
+            if (v.verse != spot.verse || v.end <= v.start)
+                continue;
+            if (left < v.end - v.start)
+                return pageAt(bi, v.start + left);
+            left -= v.end - v.start;
+            lastBlock = bi;
+            lastPos = v.end - 1;
+        }
+    // Past the verse's end (it's shorter in this translation): its last line.
+    return lastBlock >= 0 ? pageAt(lastBlock, lastPos) : pageOfVerse(spot.verse);
+}
+
 QList<int> ChapterLayout::versesOnPage(int page) const
 {
     QList<int> out;

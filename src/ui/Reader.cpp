@@ -80,7 +80,7 @@ Reader::Reader(QObject *parent)
     const Book *book = Books::byNumber(start.book);
     m_book = book ? book : Books::byNumber(1);
     m_chapter = std::clamp(start.chapter, 1, m_book->chapters);
-    m_pendingVerse = start.verse;
+    m_keep = {std::max(1, start.verse), 0};
 }
 
 Reader::~Reader()
@@ -115,7 +115,7 @@ Place Reader::currentPlace() const
     Place p;
     p.book = bookNumber();
     p.chapter = m_chapter;
-    p.verse = m_layout ? 1 : std::max(1, m_pendingVerse);
+    p.verse = m_layout ? 1 : m_keep.verse;
     if (m_layout && m_page < m_layout->pageCount())
         p.verse = std::max(1, m_layout->pages.at(m_page).firstVerse);
     return p;
@@ -197,13 +197,11 @@ void Reader::restyle()
     m_style = st;
     m_pageHeight = st.pageHeight;
 
-    // Keep the verse at the top of the page where it is.
-    const int anchor = m_layout ? currentPlace().verse : m_pendingVerse;
     m_cache.clear();
     m_cacheOrder.clear();
     if (m_book && ready() && m_viewportWidth > 0) {
         m_layout = layoutFor(m_book, m_chapter);
-        m_page = m_layout ? m_layout->pageOfVerse(anchor) : 0;
+        m_page = m_layout ? m_layout->pageOf(m_keep) : 0;
     }
     emit styleChanged();
     if (layoutMoved)
@@ -259,13 +257,13 @@ void Reader::show(const Book *book, int chapter, int verse, int page, Visit visi
     m_book = book;
     m_chapter = chapter;
     // Before the window has said how big a page is, just note the place.
-    m_pendingVerse = std::max(1, verse);
     m_layout = m_viewportWidth > 0 ? layoutFor(book, chapter) : nullptr;
     const int count = m_layout ? m_layout->pageCount() : 1;
     if (verse > 0 && m_layout)
         m_page = m_layout->pageOfVerse(verse);
     else
         m_page = page < 0 ? count - 1 : std::clamp(page, 0, count - 1);
+    m_keep = verse > 0 || !m_layout ? ChapterLayout::Spot{std::max(1, verse), 0} : m_layout->spotAt(m_page);
 
     switch (visit) {
     case Visit::Add:
@@ -435,10 +433,8 @@ void Reader::setTranslation(const QString &key)
     const Translation *t = Translations::find(key);
     if (!t || t == m_translation)
         return;
-    const Place here = currentPlace();
     m_translation = t;
     m_layout.reset();
-    m_pendingVerse = here.verse;
     emit translationChanged();
     restyle();
     m_history.replaceCurrent(currentPlace());
