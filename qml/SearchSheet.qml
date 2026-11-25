@@ -16,38 +16,29 @@ Sheet {
         input.forceActiveFocus()
     }
 
-    // Enter before the results are in waits for them.
-    property bool goWhenReady: false
-
-    function go() {
-        if (Search.busy) {
-            goWhenReady = true
-            return
-        }
-        goWhenReady = false
-        if (Search.activate())
-            sheet.close()
-        else {
-            input.text = Search.query
-            input.cursorPosition = input.text.length
-        }
+    // Enter before the results are in waits for them (Search does that).
+    function go(row) {
+        Search.activate(row === undefined ? -1 : row)
     }
 
     Connections {
         target: Search
-        function onResultsChanged() {
-            if (sheet.goWhenReady && !Search.busy)
-                sheet.go()
+        function onOpened() {
+            sheet.close()
         }
+        // A past search picked from the list fills the field.
         function onQueryChanged() {
-            sheet.goWhenReady = false
+            if (input.text !== Search.query) {
+                input.text = Search.query
+                input.cursorPosition = input.text.length
+            }
         }
     }
 
     panelWidth: Theme.sp(880)
     panelHeight: 100000
 
-    onClosed: Search.remember()
+    onClosed: Search.closed()
 
     Row {
         id: field
@@ -149,10 +140,7 @@ Sheet {
             HoverHandler { id: hover }
             Rectangle { visible: row.selected; width: 2; height: parent.height; color: Theme.accent }
             TapHandler {
-                onTapped: {
-                    Search.selected = row.index
-                    sheet.go()
-                }
+                onTapped: sheet.go(row.index)
             }
 
             Txt {

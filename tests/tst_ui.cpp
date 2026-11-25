@@ -2,6 +2,7 @@
 // against the real Bible. Settings go to Qt's test folder, not the user's.
 #include "Paths.h"
 #include "Reader.h"
+#include "SearchModel.h"
 
 #include <QFileInfo>
 #include <QSettings>
@@ -15,6 +16,13 @@ class TestUi : public QObject
     Q_OBJECT
 
     std::unique_ptr<Reader> reader;
+    std::unique_ptr<SearchModel> search;
+
+    QString rowReference(int row) const
+    {
+        return search->data(search->index(row), SearchModel::ReferenceRole).toString();
+    }
+    QString here() const { return reader->bookName() + ' ' + QString::number(reader->chapter()); }
 
     QList<int> versesHere() const { return reader->layout()->versesOnPage(reader->page()); }
 
@@ -56,10 +64,12 @@ private slots:
         QSettings().clear();
         reader = std::make_unique<Reader>(nullptr);
         reader->setViewport(900, 1100);
+        search = std::make_unique<SearchModel>();
     }
 
     void cleanup()
     {
+        search.reset();
         reader.reset();
         QSettings().clear();
     }
@@ -117,6 +127,62 @@ private slots:
         QVERIFY(versesHere().contains(first));
         resize(900, 1100);
         QVERIFY(versesHere().contains(first));
+    }
+
+    // ------------------------------------------------ search
+
+    // Back to one letter, which has nothing to search: no count, and none of
+    // the last word's verses left to open.
+    void oneLetterShowsNoStaleVerses()
+    {
+        QVERIFY(reader->goTo("ps 23"));
+        search->setQuery("love");
+        QTRY_VERIFY(!search->busy());
+        QVERIFY(search->rowCount() > 100);
+        search->setQuery("l");
+        QTRY_VERIFY(!search->busy());
+        QCOMPARE(search->rowCount(), 0);
+        QVERIFY2(!search->summary().startsWith("No verses"), qPrintable(search->summary()));
+        search->activate();
+        QCOMPARE(here(), QString("Psalms 23"));
+    }
+
+    // Enter before the results are in opens the first of them.
+    void enterWhileSearchingOpensTheFirstResult()
+    {
+        QVERIFY(reader->goTo("ps 23"));
+        search->setQuery("love");
+        QVERIFY(search->busy());
+        search->activate();
+        QTRY_COMPARE(here(), QString("Genesis 22"));
+    }
+
+    // ...but not once the sheet has closed.
+    void enterThenCloseWhileSearchingStaysPut()
+    {
+        QVERIFY(reader->goTo("ps 23"));
+        search->setQuery("the");
+        QVERIFY(search->busy());
+        search->activate();
+        search->closed();
+        QTRY_VERIFY(!search->busy());
+        QTest::qWait(50);
+        QCOMPARE(here(), QString("Psalms 23"));
+    }
+
+    // A row clicked while the next search runs is the verse you get.
+    void clickWhileSearchingOpensThatRow()
+    {
+        QVERIFY(reader->goTo("ps 23"));
+        search->setQuery("love");
+        QTRY_VERIFY(!search->busy());
+        search->setQuery("love one another");
+        QVERIFY(search->busy());
+        const QString clicked = rowReference(3);
+        search->activate(3);
+        QTRY_VERIFY(!search->busy());
+        QTest::qWait(50);
+        QCOMPARE(reader->bookName() + ' ' + QString::number(reader->chapter()), clicked.section(':', 0, 0));
     }
 };
 

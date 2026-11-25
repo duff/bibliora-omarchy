@@ -9,6 +9,8 @@
 #include <QLocale>
 #include <QSettings>
 
+#include <utility>
+
 namespace {
 
 // Lives on the search thread with a connection of its own.
@@ -139,6 +141,7 @@ void SearchModel::setQuery(const QString &query)
 void SearchModel::setSelected(int row)
 {
     row = std::clamp(row, 0, std::max(0, int(m_rows.size()) - 1));
+    m_picked = true;
     if (row == m_selected)
         return;
     m_selected = row;
@@ -147,11 +150,19 @@ void SearchModel::setSelected(int row)
 
 QString SearchModel::summary() const
 {
-    if (m_query.trimmed().isEmpty())
-        return m_history.isExamples() ? QStringLiteral("Example searches") : QStringLiteral("Recent searches");
     const QString tr = Reader::instance() ? Reader::instance()->translationAbbrev() : QString();
-    if (m_busy && m_total == 0)
-        return QStringLiteral("Searching %1…").arg(tr);
+    switch (m_status) {
+    case Status::History:
+        return m_history.isExamples() ? QStringLiteral("Example searches") : QStringLiteral("Recent searches");
+    case Status::NothingToSearch:
+        return QStringLiteral("Type a word to search the %1").arg(tr);
+    case Status::Searching:
+        if (m_total == 0)
+            return QStringLiteral("Searching the %1…").arg(tr);
+        break;
+    case Status::Done:
+        break;
+    }
     if (m_total == 0)
         return QStringLiteral("No verses in the %1").arg(tr);
     return QStringLiteral("%1 %2 in the %3")
@@ -162,24 +173,19 @@ void SearchModel::refresh() { rebuild(); }
 
 void SearchModel::rebuild()
 {
+    ++m_generation; // anything still running is stale
+    m_waiting = false;
     const QString q = m_query.trimmed();
-    QList<Row> head;
     if (q.isEmpty()) {
-        ++m_generation; // anything still running is stale
-        for (const QString &past : m_history.items())
-            head.append({Row::Past, 0, 0, 0, past, past});
-        beginResetModel();
-        m_rows = head;
-        m_total = 0;
-        m_busy = false;
-        endResetModel();
-        m_selected = 0;
-        emit selectedChanged();
-        emit resultsChanged();
+        QList<Row> past;
+        for (const QString &item : m_history.items())
+            past.append({Row::Past, 0, 0, 0, item, item});
+        setRows(Status::History, past, 0);
         return;
     }
 
     // "gen 9", "john 3:16": somewhere to go, first.
+    QList<Row> head;
     const bool hasDigit = std::any_of(q.cbegin(), q.cend(), [](QChar c) { return c.isDigit(); });
     if (hasDigit) {
         const Book *current = nullptr;
@@ -191,27 +197,23 @@ void SearchModel::rebuild()
     }
 
     const QString fts = SearchQuery::build(m_query);
-    const quint64 generation = ++m_generation;
+    if (fts.isEmpty() || !Reader::instance()) {
+        setRows(Status::NothingToSearch, head, 0);
+        return;
+    }
     // Keep showing the last results until the new ones come, so the list
     // doesn't flicker as you type.
-    QList<Row> keep;
+    QList<Row> rows = head;
     for (const Row &r : std::as_const(m_rows))
         if (r.kind == Row::Verse)
-            keep.append(r);
-    beginResetModel();
-    m_rows = head + keep;
-    m_busy = !fts.isEmpty();
-    if (fts.isEmpty())
-        m_total = 0;
-    endResetModel();
-    emit resultsChanged();
-    if (!fts.isEmpty() && Reader::instance())
-        emit run(generation, Reader::instance()->translationKey(), fts);
+            rows.append(r);
+    setRows(Status::Searching, rows, m_status == Status::Done || m_status == Status::Searching ? m_total : 0);
+    emit run(m_generation, Reader::instance()->translationKey(), fts);
 }
 
 void SearchModel::finished(quint64 generation, const QList<SearchHit> &hits, int total)
 {
-    if (generation != m_generation)
+    if (generation != m_generation || m_status != Status::Searching)
         return;
     QList<Row> rows;
     for (const Row &r : std::as_const(m_rows))
@@ -221,40 +223,65 @@ void SearchModel::finished(quint64 generation, const QList<SearchHit> &hits, int
     for (const SearchHit &h : hits)
         rows.append({Row::Verse, h.book->number, h.chapter, h.verse,
                      QStringLiteral("%1 %2:%3").arg(h.book->name).arg(h.chapter).arg(h.verse), h.text});
+    setRows(Status::Done, rows, total);
+    if (std::exchange(m_waiting, false))
+        activate(0);
+}
+
+// The one place the rows change: each status shows its own rows, and the
+// selection goes back to the first.
+void SearchModel::setRows(Status status, const QList<Row> &rows, int total)
+{
     beginResetModel();
+    m_status = status;
     m_rows = rows;
     m_total = total;
-    m_busy = false;
     endResetModel();
     m_selected = 0;
+    m_picked = false;
     emit selectedChanged();
     emit resultsChanged();
 }
 
-bool SearchModel::activate(int row)
+void SearchModel::activate(int row)
 {
-    if (row < 0)
-        row = m_selected;
-    if (row < 0 || row >= m_rows.size())
-        return false;
-    const Row r = m_rows.at(row);
+    if (row >= 0)
+        setSelected(row);
+    // Enter as you type: the rows are still the last query's, so wait for
+    // this one's. A row you picked by hand opens now.
+    if (m_status == Status::Searching && !m_picked) {
+        m_waiting = true;
+        return;
+    }
+    if (m_selected >= 0 && m_selected < m_rows.size())
+        open(m_rows.at(m_selected));
+}
+
+void SearchModel::open(const Row &r)
+{
     Reader *reader = Reader::instance();
     switch (r.kind) {
     case Row::Past:
         setQuery(r.text);
-        return false;
+        return;
     case Row::GoTo:
         remember();
         if (reader)
             reader->goTo(r.reference);
-        return true;
+        break;
     case Row::Verse:
         remember();
         if (reader)
             reader->openVerse(r.book, r.chapter, r.verse);
-        return true;
+        break;
     }
-    return false;
+    emit opened();
+}
+
+void SearchModel::closed()
+{
+    m_waiting = false;
+    remember();
 }
 
 void SearchModel::remember()
