@@ -22,7 +22,6 @@ Reader *g_reader = nullptr;
 constexpr int kCacheSize = 16;
 constexpr int kMinTextSize = 12;
 constexpr int kMaxTextSize = 48;
-constexpr int kMaxSelection = 3000; // verses; a whole book is plenty
 
 QString cacheKey(const Translation &t, const Book &b, int chapter)
 {
@@ -265,6 +264,10 @@ void Reader::show(const Book *book, int chapter, int verse, int page, Visit visi
         m_page = page < 0 ? count - 1 : std::clamp(page, 0, count - 1);
     m_keep = verse > 0 || !m_layout ? ChapterLayout::Spot{std::max(1, verse), 0} : m_layout->spotAt(m_page);
 
+    // A jump leaves the picked verses picked, but j and k start again here.
+    if (visit != Visit::Replace)
+        m_selection.dropCursor();
+
     switch (visit) {
     case Visit::Add:
         m_history.add(currentPlace());
@@ -377,13 +380,9 @@ bool Reader::goTo(const QString &reference)
         flash({ref->book->number, chapter, ref->verse});
         if (ref->endVerse) {
             // A range comes up selected, ready to copy.
-            QSet<VerseKey> verses;
-            for (int v = ref->verse; v <= ref->endVerse; ++v)
-                verses.insert({ref->book->number, chapter, v});
-            m_anchor = {ref->book->number, chapter, ref->verse};
-            m_cursor = {ref->book->number, chapter, ref->endVerse};
-            m_selecting = true;
-            setSelection(verses);
+            m_selection.startRange({ref->book->number, chapter, ref->verse},
+                                   {ref->book->number, chapter, ref->endVerse});
+            selectionMoved();
         }
     }
     return true;
@@ -486,9 +485,10 @@ void Reader::resetTextSize()
 
 QString Reader::selectionLabel() const
 {
-    if (m_selection.isEmpty() || !ready())
+    const QSet<VerseKey> &picked = m_selection.verses();
+    if (picked.isEmpty() || !ready())
         return {};
-    const auto runs = Passage::runs(*m_bible, *m_translation, QList<VerseKey>(m_selection.begin(), m_selection.end()));
+    const auto runs = Passage::runs(*m_bible, *m_translation, QList<VerseKey>(picked.begin(), picked.end()));
     QStringList labels;
     for (const auto &run : runs)
         labels.append(Passage::location(run));
@@ -500,7 +500,7 @@ QString Reader::selectionLabel() const
 QSet<int> Reader::selectedHere() const
 {
     QSet<int> out;
-    for (const VerseKey &k : m_selection)
+    for (const VerseKey &k : m_selection.verses())
         if (k.book == bookNumber() && k.chapter == m_chapter)
             out.insert(k.verse);
     return out;
@@ -508,7 +508,8 @@ QSet<int> Reader::selectedHere() const
 
 int Reader::cursorHere() const
 {
-    return m_selecting && m_cursor.book == bookNumber() && m_cursor.chapter == m_chapter ? m_cursor.verse : 0;
+    const VerseKey c = m_selection.cursor();
+    return m_selection.hasCursor() && c.book == bookNumber() && c.chapter == m_chapter ? c.verse : 0;
 }
 
 int Reader::flashHere() const
@@ -523,11 +524,8 @@ void Reader::flash(const VerseKey &key)
     m_flashAnimation.start();
 }
 
-void Reader::setSelection(const QSet<VerseKey> &verses)
+void Reader::selectionMoved()
 {
-    m_selection = verses;
-    if (m_selection.isEmpty())
-        m_selecting = false;
     emit selectionChanged();
     emit pageContentChanged();
 }
@@ -568,18 +566,11 @@ VerseKey Reader::step(const VerseKey &from, int delta) const
     return k;
 }
 
-QList<VerseKey> Reader::range(VerseKey a, VerseKey b) const
+// The first verse that starts on this page (or runs on from before).
+VerseKey Reader::topVerse() const
 {
-    if (b < a)
-        std::swap(a, b);
-    QList<VerseKey> out{a};
-    while (out.last() < b && out.size() < kMaxSelection) {
-        const VerseKey next = step(out.last(), 1);
-        if (next == out.last())
-            break;
-        out.append(next);
-    }
-    return out;
+    const Place here = currentPlace();
+    return {here.book, here.chapter, here.verse};
 }
 
 // Brings a verse into view: its chapter, and the page it starts on.
@@ -603,29 +594,18 @@ void Reader::startSelection()
 {
     if (!m_book || !m_layout)
         return;
-    if (m_selecting) {
-        // Again: start over from the cursor.
-        m_anchor = m_cursor;
-        setSelection({m_cursor});
-        return;
-    }
-    const Place here = currentPlace();
-    m_anchor = m_cursor = {here.book, here.chapter, here.verse};
-    m_selecting = true;
-    setSelection({m_cursor});
+    // Again: start over from the cursor.
+    m_selection.start(m_selection.hasCursor() ? m_selection.cursor() : topVerse());
+    selectionMoved();
 }
 
 void Reader::moveCursor(int delta)
 {
-    if (!m_selecting) {
-        startSelection();
+    if (!m_book || !m_layout)
         return;
-    }
-    m_cursor = step(m_cursor, delta);
-    const QList<VerseKey> verses = range(m_anchor, m_cursor);
-    m_selecting = true;
-    setSelection(QSet<VerseKey>(verses.begin(), verses.end()));
-    reveal(m_cursor);
+    m_selection.extend(delta, topVerse());
+    selectionMoved();
+    reveal(m_selection.cursor());
 }
 
 void Reader::clickVerse(int verse, int modifiers)
@@ -633,28 +613,20 @@ void Reader::clickVerse(int verse, int modifiers)
     if (verse <= 0 || !m_book)
         return;
     const VerseKey key{m_book->number, m_chapter, verse};
-    if ((modifiers & Qt::ShiftModifier) && m_selecting) {
-        m_cursor = key;
-        const QList<VerseKey> verses = range(m_anchor, m_cursor);
-        setSelection(QSet<VerseKey>(verses.begin(), verses.end()));
-        return;
-    }
-    // Otherwise it adds the verse, or drops it if it's already picked.
-    QSet<VerseKey> verses = m_selecting ? m_selection : QSet<VerseKey>{};
-    if (verses.contains(key))
-        verses.remove(key);
+    // Shift runs on to the verse; otherwise it's added, or dropped if picked.
+    if (modifiers & Qt::ShiftModifier)
+        m_selection.extendTo(key);
     else
-        verses.insert(key);
-    m_anchor = m_cursor = key;
-    m_selecting = true;
-    setSelection(verses);
+        m_selection.toggle(key);
+    selectionMoved();
 }
 
 void Reader::copySelection()
 {
-    if (m_selection.isEmpty() || !ready())
+    const QSet<VerseKey> &picked = m_selection.verses();
+    if (picked.isEmpty() || !ready())
         return;
-    const QList<VerseKey> verses(m_selection.begin(), m_selection.end());
+    const QList<VerseKey> verses(picked.begin(), picked.end());
     const QString text = Passage::clipboardText(*m_bible, *m_translation, verses);
     if (text.isEmpty())
         return;
@@ -666,8 +638,8 @@ void Reader::copySelection()
 
 void Reader::clearSelection()
 {
-    m_selecting = false;
-    setSelection({});
+    m_selection.clear();
+    selectionMoved();
 }
 
 // ------------------------------------------------------------------ dictionary

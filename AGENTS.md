@@ -64,7 +64,8 @@ src/app/     main.cpp (command line, single instance, screenshots), Instance
 src/core/    Paths, Toml, Skill (linking the agent skill into agents' folders)
 src/bible/   No UI, unit-tested: Books, Translations, Reference (parsing
              "jn 3:16" and bibliora:// links), Bible (SQLite), Markup,
-             Typesetter (pages), History, Passage (the copy format), SearchQuery
+             Typesetter (pages), History, Passage (the copy format), SearchQuery,
+             Selection (picking verses)
 src/ui/      QML-facing: Theme, Reader (the controller), PageItem (draws a
              page into the scene graph), SearchModel, GoToModel, ReadingFonts
 qml/         Main.qml and the sheets (GoTo, Search, Translation, Dictionary, About,

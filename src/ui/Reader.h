@@ -3,6 +3,7 @@
 #include "Bible.h"
 #include "History.h"
 #include "Passage.h"
+#include "Selection.h"
 #include "Typesetter.h"
 
 #include <QHash>
@@ -94,8 +95,8 @@ public:
     qreal pageHeight() const { return m_pageHeight; }
     qreal lineHeight() const { return m_style.lineHeight; }
 
-    bool selecting() const { return m_selecting; }
-    int selectedCount() const { return int(m_selection.size()); }
+    bool selecting() const { return m_selection.kind() != Selection::Kind::None; }
+    int selectedCount() const { return int(m_selection.verses().size()); }
     QString selectionLabel() const;
 
     // For PageItem.
@@ -174,9 +175,9 @@ private:
     void relayout();
     void prefetch();
     void flash(const VerseKey &key);
-    void setSelection(const QSet<VerseKey> &verses);
+    void selectionMoved();
     VerseKey step(const VerseKey &from, int delta) const;
-    QList<VerseKey> range(VerseKey a, VerseKey b) const;
+    VerseKey topVerse() const;
     void reveal(const VerseKey &key);
     void scheduleSave();
     void save();
@@ -208,9 +209,7 @@ private:
 
     History m_history;
 
-    bool m_selecting = false;
-    QSet<VerseKey> m_selection;
-    VerseKey m_anchor, m_cursor;
+    Selection m_selection{[this](const VerseKey &from, int delta) { return step(from, delta); }};
 
     QString m_pageWordsFor; // the page and layout they're from
     QStringList m_pageWords;

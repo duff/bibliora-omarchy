@@ -129,6 +129,55 @@ private slots:
         QVERIFY(versesHere().contains(first));
     }
 
+    // ------------------------------------------------ picking verses
+
+    // j after a jump picks on the new page; the jump stays in history.
+    void pickingAfterAJumpStaysThere()
+    {
+        reader->startSelection(); // Genesis 1:1
+        QVERIFY(reader->goTo("jn 3"));
+        reader->moveCursor(1);
+        QCOMPARE(here(), QString("John 3"));
+        QCOMPARE(reader->selectedHere(), QSet<int>({1}));
+        QCOMPARE(reader->selectedCount(), 2); // Genesis 1:1 too
+        reader->back();
+        QCOMPARE(here(), QString("Genesis 1"));
+        reader->forward();
+        QCOMPARE(here(), QString("John 3"));
+    }
+
+    // Ctrl-click drops a verse from a range; k carries on from what's left.
+    void ctrlClickOutOfARangeThenK()
+    {
+        QVERIFY(reader->goTo("jn 3"));
+        reader->startSelection();
+        reader->moveCursor(1);
+        reader->moveCursor(1);
+        QCOMPARE(reader->selectedHere(), QSet<int>({1, 2, 3}));
+        reader->clickVerse(3, Qt::ControlModifier);
+        QCOMPARE(reader->selectedHere(), QSet<int>({1, 2}));
+        reader->moveCursor(-1);
+        QCOMPARE(reader->selectedHere(), QSet<int>({1, 2}));
+        reader->moveCursor(1);
+        reader->moveCursor(1);
+        QCOMPARE(reader->selectedHere(), QSet<int>({1, 2, 3}));
+    }
+
+    // j after ctrl-picking separate verses keeps them.
+    void jAfterCtrlPickingKeepsThem()
+    {
+        QVERIFY(reader->goTo("jn 3"));
+        reader->clickVerse(1, Qt::ControlModifier);
+        reader->clickVerse(5, Qt::ControlModifier);
+        reader->moveCursor(1);
+        QCOMPARE(reader->selectedHere(), QSet<int>({1, 5, 6}));
+        reader->clickVerse(9, Qt::ShiftModifier);
+        QCOMPARE(reader->selectedHere(), QSet<int>({1, 5, 6, 7, 8, 9}));
+        reader->clearSelection();
+        QVERIFY(!reader->selecting());
+        QCOMPARE(reader->selectedCount(), 0);
+    }
+
     // ------------------------------------------------ search
 
     // Back to one letter, which has nothing to search: no count, and none of
