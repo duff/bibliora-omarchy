@@ -180,7 +180,8 @@ cmake --install build-release          # ~/.local/bin/bibliora + launcher entry
 
 `bin/relaunch` builds a release, installs it to `~/.local`, and when that
 changed Bibliora, reopens it where its window was. Claude Code runs it after
-every turn (`.claude/settings.json`).
+every turn (`.claude/settings.json`). In a git worktree it builds and runs the
+tests, and installs nothing.
 
 ## Settings
 

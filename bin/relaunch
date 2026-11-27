@@ -8,7 +8,8 @@
 # (a plain launch would just bring the old one forward).
 #
 # Claude Code runs this as a Stop hook (--hook) after every turn, so it does
-# nothing when the build installs nothing new.
+# nothing when the build installs nothing new. In a git worktree it builds and
+# runs the tests, and installs nothing.
 
 set -uo pipefail
 
@@ -42,6 +43,21 @@ fi
 out=$(cmake --build "$build" 2>&1) || fail "Bibliora didn't build:"$'\n'"$(tail -40 <<<"$out")"
 
 sum=$(cat "$build/bibliora" "$root"/packaging/bibliora.{desktop,png} | sha256sum | cut -d' ' -f1)
+
+# A git worktree is work that hasn't landed: it's built and tested here, and
+# never installed over the Bibliora the user is reading, nor reopened. That
+# comes from the main checkout, once the work is merged into it. A build
+# already tested as it is, the app and the tests both, isn't tested again.
+if [[ $(git -C "$root" rev-parse --path-format=absolute --git-dir 2>/dev/null) != "$(git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" ]]; then
+  tested=$( (echo "$sum"; find "$build" -maxdepth 1 -name 'tst_*' -type f -perm -u+x | sort | xargs cat) | sha256sum | cut -d' ' -f1)
+  if [[ ! -f $build/.tested || $(<"$build/.tested") != "$tested" ]]; then
+    out=$(ctest --test-dir "$build" --output-on-failure 2>&1) || fail "Bibliora's tests failed:"$'\n'"$(tail -60 <<<"$out")"
+    echo "$tested" >"$build/.tested"
+  fi
+  $hook || echo "Built and tested. Not installed: this is a worktree."
+  exit 0
+fi
+
 if [[ -x $app && -f $stamp && $(<"$stamp") == "$sum" ]]; then
   exit 0
 fi
