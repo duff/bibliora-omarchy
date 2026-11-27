@@ -20,8 +20,9 @@ with the Bible attached, which the Omarchy package downloads. It asks before
 publishing; never run it unless the user asks for a release.
 
 `bin/relaunch` (a Stop hook in `.claude/settings.json`) builds `build-release`,
-installs to `~/.local`, and reopens the installed app on its workspace. The
-user reads the installed app, not `./build/bibliora`. In a git worktree it
+installs to `~/.local`, and reopens the installed app on its workspace; when
+it wasn't open, it opens silently on a workspace with no windows that no
+monitor is showing. The user reads the installed app, not `./build/bibliora`. In a git worktree it
 builds and runs the tests instead, and installs nothing: only the main
 checkout installs.
 

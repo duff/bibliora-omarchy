@@ -1,6 +1,8 @@
 #!/bin/bash
 # Rebuild Bibliora and install it to ~/.local. When the installed app changed,
-# reopen it where its window was and leave the keyboard where it was.
+# reopen it where its window was and leave the keyboard where it was; when it
+# wasn't open, open it on a workspace with no windows that no monitor is
+# showing.
 #
 # The new Bibliora opens beside the old one, which then quits, so the new window
 # takes over the old one's tile exactly. Nothing else on the desktop is moved
@@ -91,6 +93,17 @@ window_of() {
   hyprctl clients -j | jq -c --argjson pids "$pids" '[.[] | select(.pid as $p | $pids | index($p))] | sort_by(.focusHistoryID) | first // empty'
 }
 
+# The lowest-numbered workspace with no windows that no monitor is showing.
+free_workspace() {
+  local taken id=1
+  taken=$({
+    hyprctl workspaces -j | jq '.[] | select(.windows > 0) | .id'
+    hyprctl monitors -j | jq '.[] | .activeWorkspace.id'
+  } | sort -nu)
+  while grep -qx "$id" <<<"$taken"; do ((id++)); done
+  echo "$id"
+}
+
 old_pids=($(installed_pids))
 old=$(window_of "${old_pids[@]}")
 focused=$(hyprctl activewindow -j | jq -r '.address // empty')
@@ -105,7 +118,10 @@ update-desktop-database "$HOME/.local/share/applications" >/dev/null 2>&1 || tru
 # Through Hyprland, like a keybinding, so Bibliora gets the desktop's environment.
 launch="uwsm-app -- $app --replace"
 if [[ -z $old ]]; then
-  dispatch "hl.dsp.exec_cmd(\"$launch\")"
+  # Bibliora wasn't open, so it opens out of the way, where nothing is, leaving
+  # the screen and the keyboard as they were. Wilbur can install several apps
+  # at once while the user works.
+  hyprctl eval "hl.exec_cmd(\"$launch\", { workspace = \"$(free_workspace) silent\" })" >/dev/null
 elif hyprctl monitors -j | jq -e --argjson ws "$(jq .workspace.id <<<"$old")" \
   'any(.[]; .activeWorkspace.id == $ws or .specialWorkspace.id == $ws)' >/dev/null; then
   # On screen: a new window splits the focused one, so focus the old Bibliora.
@@ -143,7 +159,9 @@ fi
 
 # Leave the keyboard where it was; if that was Bibliora, it is the new window.
 if [[ -n $focused && $focused != $(jq -r '.address // empty' <<<"$old") ]]; then
-  dispatch "hl.dsp.focus({ window = \"address:$focused\" })"
+  # Only when something took it: focusing moves the pointer too.
+  [[ $(hyprctl activewindow -j | jq -r '.address // empty') == "$focused" ]] ||
+    dispatch "hl.dsp.focus({ window = \"address:$focused\" })"
 elif [[ -n $old ]]; then
   dispatch "hl.dsp.focus({ window = \"$win\" })"
 fi
